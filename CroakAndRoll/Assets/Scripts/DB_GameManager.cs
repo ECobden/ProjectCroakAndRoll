@@ -26,26 +26,11 @@ public class DB_GameManager : MonoBehaviour
     [Header("Round Manager")]
     [SerializeField] private DB_RoundManager roundManager;
 
-    [Header("Shared Dice")]
-    [SerializeField] private GameObject dicePrefab;
-    [SerializeField] private Transform diceParent;
-    [SerializeField] private DB_DiceTargetArea diceTargetArea;
-    [SerializeField] private Transform diceIdlePositionA;
-    [SerializeField] private Transform diceIdlePositionB;
-    [SerializeField] private Transform playerLaunchPositionA;
-    [SerializeField] private Transform playerLaunchPositionB;
-    [SerializeField] private Transform houseLaunchPositionA;
-    [SerializeField] private Transform houseLaunchPositionB;
+    [Header("Dice Manager")]
+    [SerializeField] private DB_DiceManager diceManager;
 
-    [Header("UI References")]
-    [SerializeField] private GameObject buttonPanel;
-    [SerializeField] private UI_ButtonController buttonLeft;
-    [SerializeField] private UI_ButtonController buttonRight;
-    [SerializeField] private TextMeshProUGUI scoreText;
-    [SerializeField] private TextMeshProUGUI goalText;
-    [SerializeField] private GameObject gameOverPanel;
-    [SerializeField] private Button restartButton;
-    [SerializeField] private TurnMarker turnMarker;
+    [Header("UI Manager")]
+    [SerializeField] private DB_UIManager uiManager;
 
     [Header("Game Settings")]
     [SerializeField] private int smallBetAmount = 50;
@@ -53,25 +38,13 @@ public class DB_GameManager : MonoBehaviour
     [SerializeField] private KeyCode restartKey = KeyCode.R;
     [SerializeField] private float newRoundDelay = 1.5f;
     
-    [Header("Score Animation")]
-    [SerializeField] private float scorePunchScale = 1.3f;
-    [SerializeField] private float scorePunchDuration = 0.3f;
-    [SerializeField] private float scoreTransferDelay = 0.5f;
-    [SerializeField] private float scoreTransferSpeed = 0.05f;
-    
     #endregion
 
     #region Private Fields
     
-    private DB_DiceController diceControllerA;
-    private DB_DiceController diceControllerB;
-    private bool isDiceRolling = false;
-    
     private TurnState currentTurn = TurnState.PlayerTurn;
     private bool isProcessingTurn = false;
-    
-    private Coroutine scoreTransferCoroutine;
-    private int currentTurnTotal = 0;
+    private bool isBettingMode = true;
     
     #endregion
 
@@ -100,34 +73,14 @@ public class DB_GameManager : MonoBehaviour
 
     private void InitializeDice()
     {
-        SpawnSharedDice();
-        InitializeSharedDice();
-        RefreshDiceIdlePositions();
+        if (diceManager != null)
+            diceManager.Initialize();
     }
 
     private void InitializeUI()
     {
-        SetupButtonListeners();
-        HideAllPanels();
-        
-        // Clear score text on start
-        if (scoreText != null)
-            scoreText.text = "";
-    }
-
-    private void SetupButtonListeners()
-    {
-        if (restartButton != null)
-            restartButton.onClick.AddListener(RestartGame);
-    }
-
-    private void HideAllPanels()
-    {
-        if (buttonPanel != null)
-            buttonPanel.SetActive(false);
-
-        if (gameOverPanel != null)
-            gameOverPanel.SetActive(false);
+        if (uiManager != null)
+            uiManager.Initialize(RestartGame);
     }
     
     #endregion
@@ -143,12 +96,12 @@ public class DB_GameManager : MonoBehaviour
         }
 
         currentTurn = TurnState.PlayerTurn;
-        currentTurnTotal = 0;
         
-        UpdateGoalText("Roll Closest to 21");
-        
-        if (turnMarker != null)
-            turnMarker.SetPlayerTurnPosition();
+        if (uiManager != null)
+        {
+            uiManager.UpdateGoalText("Roll Closest to 21");
+            uiManager.SetTurnMarkerToPlayer();
+        }
     }
 
     public void EndPlayerTurn()
@@ -180,17 +133,16 @@ public class DB_GameManager : MonoBehaviour
         }
 
         currentTurn = TurnState.HouseTurn;
-        currentTurnTotal = 0;
         Debug.Log("House's turn");
 
-        if (player != null)
+        if (player != null && uiManager != null)
         {
             int playerScore = player.GetTurnValue();
-            UpdateGoalText($"House must roll {playerScore} to win");
+            uiManager.UpdateGoalText($"House must roll {playerScore} to win");
         }
         
-        if (turnMarker != null)
-            turnMarker.SetHouseTurnPosition();
+        if (uiManager != null)
+            uiManager.SetTurnMarkerToHouse();
 
         if (house != null)
         {
@@ -230,10 +182,8 @@ public class DB_GameManager : MonoBehaviour
     {
         Debug.Log("GAME OVER - Player busted!");
         
-        // Clear score text
-        if (scoreText != null)
-            scoreText.text = "";
-        currentTurnTotal = 0;
+        if (uiManager != null)
+            uiManager.ClearScoreText();
         
         CheckGameOver();
     }
@@ -249,10 +199,8 @@ public class DB_GameManager : MonoBehaviour
             player.AddMoney(totalPayout);
         }
         
-        // Clear score text
-        if (scoreText != null)
-            scoreText.text = "";
-        currentTurnTotal = 0;
+        if (uiManager != null)
+            uiManager.ClearScoreText();
         
         CheckGameOver();
     }
@@ -261,10 +209,8 @@ public class DB_GameManager : MonoBehaviour
     {
         Debug.Log("HOUSE WINS - House beat player's score!");
         
-        // Clear score text
-        if (scoreText != null)
-            scoreText.text = "";
-        currentTurnTotal = 0;
+        if (uiManager != null)
+            uiManager.ClearScoreText();
         
         CheckGameOver();
     }
@@ -273,7 +219,9 @@ public class DB_GameManager : MonoBehaviour
     {
         Debug.Log("GAME OVER - Player is out of money!");
         currentTurn = TurnState.GameOver;
-        ShowGameOverPanel();
+        
+        if (uiManager != null)
+            uiManager.ShowGameOverPanel();
     }
 
     private void CheckGameOver()
@@ -282,7 +230,9 @@ public class DB_GameManager : MonoBehaviour
         {
             Debug.Log("GAME OVER - Player cannot afford even the smallest bet!");
             currentTurn = TurnState.GameOver;
-            ShowGameOverPanel();
+            
+            if (uiManager != null)
+                uiManager.ShowGameOverPanel();
             return;
         }
 
@@ -290,7 +240,9 @@ public class DB_GameManager : MonoBehaviour
         {
             Debug.Log("GAME OVER - Player wins! House is out of money!");
             currentTurn = TurnState.GameOver;
-            ShowGameOverPanel();
+            
+            if (uiManager != null)
+                uiManager.ShowGameOverPanel();
             return;
         }
 
@@ -301,8 +253,6 @@ public class DB_GameManager : MonoBehaviour
     #endregion
 
     #region Betting
-
-    private bool isBettingMode = true;
 
     public void OnSmallBetSelected()
     {
@@ -316,7 +266,7 @@ public class DB_GameManager : MonoBehaviour
         }
 
         Debug.Log($"Player selected small bet: {smallBetAmount}");
-        DeactivateButtonsAndSwitchToGameplay();
+        StartCoroutine(SwitchToGameplayMode());
         player.OnTurnStart(smallBetAmount);
     }
 
@@ -331,60 +281,32 @@ public class DB_GameManager : MonoBehaviour
         }
 
         Debug.Log($"Player selected large bet: {largeBetAmount}");
-        DeactivateButtonsAndSwitchToGameplay();
+        StartCoroutine(SwitchToGameplayMode());
         player.OnTurnStart(largeBetAmount);
     }
     
-    private void DeactivateButtonsAndSwitchToGameplay()
+    private IEnumerator SwitchToGameplayMode()
     {
-        StartCoroutine(DeactivateAndReactivateButtons());
-    }
-    
-    private IEnumerator DeactivateAndReactivateButtons()
-    {
-        // Deactivate buttons
-        if (buttonLeft != null)
-            buttonLeft.DeactivateButton();
-        if (buttonRight != null)
-            buttonRight.DeactivateButton();
+        if (uiManager == null) yield break;
         
-        // Wait a bit for deactivation animation
-        yield return new WaitForSeconds(0.6f);
-        
-        // Switch to gameplay mode
         isBettingMode = false;
         
-        // Update button texts
-        if (buttonLeft != null)
-            buttonLeft.SetButtonText("Stand");
-        if (buttonRight != null)
-            buttonRight.SetButtonText("Roll");
-        
-        // Set new button actions for gameplay
-        if (buttonLeft != null)
-            buttonLeft.SetButtonAction(() => { if (player != null) player.Stand(); });
-        if (buttonRight != null)
-            buttonRight.SetButtonAction(() => { if (player != null) player.RollDice(); });
-        
-        // Activate buttons
-        if (buttonLeft != null)
-            buttonLeft.ActivateButton();
-        if (buttonRight != null)
-            buttonRight.ActivateButton();
-        
-        // Stand button should start disabled (player hasn't rolled yet)
-        yield return new WaitForSeconds(0.1f); // Wait for activation animation
-        if (buttonLeft != null)
-            buttonLeft.DisableButton();
+        yield return StartCoroutine(uiManager.SwitchToGameplayButtons(
+            () => { if (player != null) player.Stand(); },
+            () => { if (player != null) player.RollDice(); }
+        ));
     }
 
     public void OnStartNewRound()
     {
         Debug.Log("Starting new round...");
 
+        // Reset turn state for new round
+        currentTurn = TurnState.PlayerTurn;
+        isBettingMode = true;
+
         roundManager.CountUpRound();
 
-        //Show bet selection for new round
         ShowBetSelectionPanel();
                
         if (house != null)
@@ -392,10 +314,8 @@ public class DB_GameManager : MonoBehaviour
             house.ResetTurnValue();
         }
         
-        // Clear score text for new round
-        if (scoreText != null)
-            scoreText.text = "";
-        currentTurnTotal = 0;
+        if (uiManager != null)
+            uiManager.ClearScoreText();
     }
 
     private IEnumerator StartNewRoundAfterDelay()
@@ -414,7 +334,9 @@ public class DB_GameManager : MonoBehaviour
         
         ResetGameState();
         ResetPlayers();
-        RefreshDiceIdlePositions();
+        
+        if (diceManager != null)
+            diceManager.RefreshDiceIdlePositions();
         
         // Reinitialize and show bet selection
         roundManager.InitializeRound();
@@ -427,13 +349,11 @@ public class DB_GameManager : MonoBehaviour
         isProcessingTurn = false;
         isBettingMode = true;
         
-        HideGameOverPanel();
-        
-        // Reset buttons for betting
-        if (buttonLeft != null)
-            buttonLeft.DeactivateButton();
-        if (buttonRight != null)
-            buttonRight.DeactivateButton();
+        if (uiManager != null)
+        {
+            uiManager.HideGameOverPanel();
+            uiManager.DeactivateButtons();
+        }
     }
 
     private void ResetPlayers()
@@ -450,241 +370,68 @@ public class DB_GameManager : MonoBehaviour
     
     #endregion
 
-    #region UI Management
-
-    private void ShowButtonPanel()
-    {
-        if (buttonPanel != null)
-            buttonPanel.SetActive(true);
-    }
-
-    private void HideButtonPanel()
-    {
-        if (buttonPanel != null)
-            buttonPanel.SetActive(false);
-    }
+    #region UI Helper
 
     private void ShowBetSelectionPanel()
     {
         isBettingMode = true;
         
-        // Position turn marker to player
-        if (turnMarker != null)
-            turnMarker.SetPlayerTurnPosition();
-        
-        // Show button panel first
-        ShowButtonPanel();
-        
-        // Update button texts for betting
-        if (buttonLeft != null)
-            buttonLeft.SetButtonText("Small Bet\n$" + smallBetAmount);
-        if (buttonRight != null)
-            buttonRight.SetButtonText("Large Bet\n$" + largeBetAmount);
-        
-        // Set button actions for betting
-        if (buttonLeft != null)
-            buttonLeft.SetButtonAction(OnSmallBetSelected);
-        if (buttonRight != null)
-            buttonRight.SetButtonAction(OnLargeBetSelected);
-        
-        // Activate buttons
-        if (buttonLeft != null)
-            buttonLeft.ActivateButton();
-        if (buttonRight != null)
-            buttonRight.ActivateButton();
-        
-        // Ensure buttons are enabled (in case they were already active from previous round)
-        if (buttonLeft != null)
-            buttonLeft.EnableButton();
-        if (buttonRight != null)
-            buttonRight.EnableButton();
-    }
-
-    private void ShowGameOverPanel()
-    {
-        if (gameOverPanel != null)
-            gameOverPanel.SetActive(true);
-    }
-
-    private void HideGameOverPanel()
-    {
-        if (gameOverPanel != null)
-            gameOverPanel.SetActive(false);
-    }
-
-    private void UpdateGoalText(string text)
-    {
-        if (goalText != null)
-            goalText.text = text;
-    }
-
-    public void UpdateScoreText(int turnTotal)
-    {
-        // Calculate the roll value (difference from previous total)
-        int rollValue = turnTotal - currentTurnTotal;
-        currentTurnTotal = turnTotal;
-        
-        if (scoreText != null)
+        if (uiManager != null)
         {
-            scoreText.text = rollValue.ToString();
-            
-            // Punch animation
-            scoreText.transform.DOKill();
-            scoreText.transform.localScale = Vector3.one;
-            scoreText.transform.DOPunchScale(Vector3.one * (scorePunchScale - 1f), scorePunchDuration, 5, 0.5f);
+            uiManager.ShowBetSelection(smallBetAmount, largeBetAmount, OnSmallBetSelected, OnLargeBetSelected);
         }
-        
-        // Stop any existing transfer animation
-        if (scoreTransferCoroutine != null)
-        {
-            StopCoroutine(scoreTransferCoroutine);
-        }
-        
-        // Start score transfer animation
-        scoreTransferCoroutine = StartCoroutine(TransferScoreAnimation(rollValue, turnTotal));
-    }
-    
-    private IEnumerator TransferScoreAnimation(int rollValue, int turnTotal)
-    {
-        // Wait for punch animation to finish plus delay
-        yield return new WaitForSeconds(scorePunchDuration + scoreTransferDelay);
-        
-        // Get starting value for goal text animation (previous total)
-        int startingTotal = turnTotal - rollValue;
-        string playerName = IsPlayerTurn() ? "Player" : "House";
-        bool isFirstRoll = (startingTotal == 0);
-        
-        // Simultaneously count down score text (roll value) and count up goal text (turn total)
-        for (int i = 0; i <= rollValue; i++)
-        {
-            int remainingRoll = rollValue - i;
-            int currentTotal = startingTotal + i;
-            
-            // Update score text (counting down the roll value)
-            if (scoreText != null)
-            {
-                scoreText.text = remainingRoll > 0 ? remainingRoll.ToString() : "";
-            }
-            
-            // Update goal text (counting up the turn total)
-            // Only update to X/21 format if not first roll, or on the last iteration of first roll
-            if (goalText != null && (!isFirstRoll || i == rollValue))
-            {
-                goalText.text = $"{playerName}: {currentTotal} / 21";
-            }
-            
-            yield return new WaitForSeconds(scoreTransferSpeed);
-        }
-        
-        scoreTransferCoroutine = null;
     }
     
     #endregion
 
     #region Dice Management
 
-    private void SpawnSharedDice()
-    {
-        if (dicePrefab == null) return;
-
-        if (diceControllerA == null)
-        {
-            GameObject diceInstanceA = Instantiate(dicePrefab, GetIdlePosition(diceIdlePositionA), Quaternion.identity, diceParent);
-            diceControllerA = diceInstanceA.GetComponent<DB_DiceController>();
-        }
-
-        if (diceControllerB == null)
-        {
-            GameObject diceInstanceB = Instantiate(dicePrefab, GetIdlePosition(diceIdlePositionB), Quaternion.identity, diceParent);
-            diceControllerB = diceInstanceB.GetComponent<DB_DiceController>();
-        }
-    }
-
-    private void InitializeSharedDice()
-    {
-        if (diceControllerA != null)
-        {
-            diceControllerA.Initialize(GetIdlePosition(diceIdlePositionA));
-            if (diceTargetArea != null)
-                diceControllerA.SetTargetArea(diceTargetArea);
-        }
-
-        if (diceControllerB != null)
-        {
-            diceControllerB.Initialize(GetIdlePosition(diceIdlePositionB));
-            if (diceTargetArea != null)
-                diceControllerB.SetTargetArea(diceTargetArea);
-        }
-    }
-
-    public void RefreshDiceIdlePositions()
-    {
-        if (diceControllerA != null)
-            diceControllerA.SetIdlePosition(GetIdlePosition(diceIdlePositionA));
-
-        if (diceControllerB != null)
-            diceControllerB.SetIdlePosition(GetIdlePosition(diceIdlePositionB));
-    }
-
-    private Vector3 GetIdlePosition(Transform target)
-    {
-        return target != null ? target.position : Vector3.zero;
-    }
-
     public void RollSharedDice(System.Action<int, int> onComplete, bool isPlayerTurn)
     {
-        if (isDiceRolling) return;
+        if (diceManager == null || diceManager.IsDiceRolling()) return;
         StartCoroutine(RollDiceCoroutine(onComplete, isPlayerTurn));
     }
 
     private IEnumerator RollDiceCoroutine(System.Action<int, int> onComplete, bool isPlayerTurn)
     {
-        isDiceRolling = true;
-        
         // Disable both buttons during rolling
-        if (!isBettingMode && isPlayerTurn)
+        if (!isBettingMode && isPlayerTurn && uiManager != null)
         {
-            if (buttonLeft != null)
-                buttonLeft.DisableButton();
-            if (buttonRight != null)
-                buttonRight.DisableButton();
+            uiManager.DisableGameplayButtons();
         }
 
-        // Get appropriate launch positions based on turn
-        Vector3 launchPosA = isPlayerTurn ? GetIdlePosition(playerLaunchPositionA) : GetIdlePosition(houseLaunchPositionA);
-        Vector3 launchPosB = isPlayerTurn ? GetIdlePosition(playerLaunchPositionB) : GetIdlePosition(houseLaunchPositionB);
+        // Roll dice and wait for callback
+        bool rollComplete = false;
+        int resultA = 0;
+        int resultB = 0;
 
-        // Tell dice to roll from launch positions
-        if (diceControllerA != null)
-            diceControllerA.RollFromLaunchPosition(launchPosA);
+        diceManager.RollDice((a, b) =>
+        {
+            resultA = a;
+            resultB = b;
+            rollComplete = true;
+        }, isPlayerTurn);
 
-        if (diceControllerB != null)
-            diceControllerB.RollFromLaunchPosition(launchPosB);
-
-        // Wait for both dice to finish rolling
-        while ((diceControllerA != null && diceControllerA.IsRolling()) ||
-               (diceControllerB != null && diceControllerB.IsRolling()))
+        // Wait for roll to complete
+        while (!rollComplete)
         {
             yield return null;
         }
 
-        // Get dice values
-        int diceAValue = diceControllerA != null ? diceControllerA.GetLastRollValue() : 0;
-        int diceBValue = diceControllerB != null ? diceControllerB.GetLastRollValue() : 0;
-
-        isDiceRolling = false;
-        
         // Re-enable buttons after dice finish rolling (for player turn only)
         if (!isBettingMode && isPlayerTurn)
         {
-            if (buttonLeft != null)
-                buttonLeft.EnableButton();
-            if (buttonRight != null)
-                buttonRight.EnableButton();
+            if (uiManager != null)
+            {
+                // Only enable Stand button if player has rolled this turn
+                if (player != null && player.HasRolledThisTurn())
+                    uiManager.EnableStandButton();
+                uiManager.EnableRollButton();
+            }
         }
 
         // Callback with results
-        onComplete?.Invoke(diceAValue, diceBValue);
+        onComplete?.Invoke(resultA, resultB);
     }
     
     #endregion
@@ -697,16 +444,14 @@ public class DB_GameManager : MonoBehaviour
     
     public bool IsHouseTurn() => currentTurn == TurnState.HouseTurn;
 
-    public bool IsDiceRolling() => isDiceRolling;
+    public bool IsDiceRolling() => diceManager != null && diceManager.IsDiceRolling();
     
     public void DisableGameplayButtons()
     {
         if (isBettingMode) return;
         
-        if (buttonLeft != null)
-            buttonLeft.DisableButton();
-        if (buttonRight != null)
-            buttonRight.DisableButton();
+        if (uiManager != null)
+            uiManager.DisableGameplayButtons();
     }
     
     #endregion

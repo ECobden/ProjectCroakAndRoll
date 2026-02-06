@@ -88,6 +88,10 @@ public class DB_DiceController : MonoBehaviour
     public void SetIdlePosition(Vector3 newIdlePosition)
     {
         idlePosition = newIdlePosition;
+    }
+
+    public void ReturnToIdlePosition()
+    {
         if (!isRolling && !isLerping)
         {
             StartCoroutine(LerpToPositionInternal(idlePosition));

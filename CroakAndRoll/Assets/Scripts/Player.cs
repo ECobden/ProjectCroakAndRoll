@@ -17,11 +17,16 @@ public class Player : MonoBehaviour
     private int turnValue = 0;
     private int lastRollValue = 0;
     private bool canAct = false;
+    private bool hasRolledThisTurn = false;
     private DB_GameManager gameManager;
+    private DB_DiceManager diceManager;
+    private DB_UIManager uiManager;
 
     void Start()
     {
         gameManager = FindFirstObjectByType<DB_GameManager>();
+        diceManager = FindFirstObjectByType<DB_DiceManager>();
+        uiManager = FindFirstObjectByType<DB_UIManager>();
         currentMoney = startingMoney;
         
         if (moneyController != null)
@@ -44,6 +49,7 @@ public class Player : MonoBehaviour
     {
         lastRollValue = diceAValue + diceBValue;
         turnValue += lastRollValue;
+        hasRolledThisTurn = true;
 
         Debug.Log($"Player rolled: {lastRollValue} (Dice: {diceAValue} + {diceBValue}). Turn total: {turnValue}");
 
@@ -73,6 +79,7 @@ public class Player : MonoBehaviour
         turnValue = 0;
         lastRollValue = 0;
         canAct = true;
+        hasRolledThisTurn = false;
         UpdateTurnValueUI();
         
         // Update the bet amount
@@ -110,6 +117,11 @@ public class Player : MonoBehaviour
         return turnValue;
     }
 
+    public bool HasRolledThisTurn()
+    {
+        return hasRolledThisTurn;
+    }
+
     public void Stand()
     {
         if (!canAct)
@@ -124,6 +136,15 @@ public class Player : MonoBehaviour
             return;
         }
 
+        /* Player must have rolled at least once before standing to prevent accidental stands at the start of the turn.
+        THIS CURRENTLY CAUSES ISSUES WITH BUTTONS
+        if (!hasRolledThisTurn)
+        {
+            Debug.LogWarning("Player must roll at least once before standing. Ignoring stand action.");
+            return;
+        }
+        */
+
         canAct = false;
         Debug.Log($"Player stands with {turnValue}");
         
@@ -131,7 +152,10 @@ public class Player : MonoBehaviour
         if (gameManager != null)
         {
             gameManager.DisableGameplayButtons();
-            gameManager.RefreshDiceIdlePositions();
+            
+            if (diceManager != null)
+                diceManager.RefreshDiceIdlePositions();
+            
             gameManager.EndPlayerTurn();
         }
         else
@@ -150,9 +174,9 @@ public class Player : MonoBehaviour
 
     private void UpdateTurnValueUI()
     {
-        if (gameManager != null)
+        if (uiManager != null)
         {
-            gameManager.UpdateScoreText(turnValue);
+            uiManager.UpdateScoreText(turnValue, true); // true = player turn
         }
     }
 

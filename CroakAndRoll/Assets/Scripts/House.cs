@@ -20,10 +20,14 @@ public class House : MonoBehaviour
     private int lastRollValue = 0;
     private int targetValue = 0;
     private DB_GameManager gameManager;
+    private DB_DiceManager diceManager;
+    private DB_UIManager uiManager;
 
     void Start()
     {
         gameManager = FindFirstObjectByType<DB_GameManager>();
+        diceManager = FindFirstObjectByType<DB_DiceManager>();
+        uiManager = FindFirstObjectByType<DB_UIManager>();
         currentMoney = startingMoney;
         UpdateMoneyUI();
     }
@@ -117,28 +121,28 @@ public class House : MonoBehaviour
     private void OnWin()
     {
         // Move dice back to idle positions
+        if (diceManager != null)
+            diceManager.RefreshDiceIdlePositions();
+        
         if (gameManager != null)
-        {
-            gameManager.RefreshDiceIdlePositions();
             gameManager.HouseWins();
-        }
     }
 
     private void OnBust()
     {
         // Move dice back to idle positions
+        if (diceManager != null)
+            diceManager.RefreshDiceIdlePositions();
+        
         if (gameManager != null)
-        {
-            gameManager.RefreshDiceIdlePositions();
             gameManager.HouseBust();
-        }
     }
 
     private void UpdateTurnValueUI()
     {
-        if (gameManager != null)
+        if (uiManager != null)
         {
-            gameManager.UpdateScoreText(turnValue);
+            uiManager.UpdateScoreText(turnValue, false); // false = house turn
         }
     }
 
