@@ -39,13 +39,13 @@ public class DB_GameManager : MonoBehaviour
 
     [Header("UI References")]
     [SerializeField] private GameObject buttonPanel;
-    [SerializeField] private GameObject betSelectionPanel;
-    [SerializeField] private Button smallBetButton;
-    [SerializeField] private Button largeBetButton;
+    [SerializeField] private UI_ButtonController buttonLeft;
+    [SerializeField] private UI_ButtonController buttonRight;
     [SerializeField] private TextMeshProUGUI scoreText;
     [SerializeField] private TextMeshProUGUI goalText;
     [SerializeField] private GameObject gameOverPanel;
     [SerializeField] private Button restartButton;
+    [SerializeField] private TurnMarker turnMarker;
 
     [Header("Game Settings")]
     [SerializeField] private int smallBetAmount = 50;
@@ -117,20 +117,14 @@ public class DB_GameManager : MonoBehaviour
 
     private void SetupButtonListeners()
     {
-        if (smallBetButton != null)
-            smallBetButton.onClick.AddListener(OnSmallBetSelected);
-
-        if (largeBetButton != null)
-            largeBetButton.onClick.AddListener(OnLargeBetSelected);
-
         if (restartButton != null)
             restartButton.onClick.AddListener(RestartGame);
     }
 
     private void HideAllPanels()
     {
-        if (betSelectionPanel != null)
-            betSelectionPanel.SetActive(false);
+        if (buttonPanel != null)
+            buttonPanel.SetActive(false);
 
         if (gameOverPanel != null)
             gameOverPanel.SetActive(false);
@@ -148,6 +142,9 @@ public class DB_GameManager : MonoBehaviour
         currentTurnTotal = 0;
         
         UpdateGoalText("Roll Closest to 21");
+        
+        if (turnMarker != null)
+            turnMarker.SetPlayerTurnPosition();
     }
 
     public void EndPlayerTurn()
@@ -171,6 +168,9 @@ public class DB_GameManager : MonoBehaviour
             int playerScore = player.GetTurnValue();
             UpdateGoalText($"House must roll {playerScore} to win");
         }
+        
+        if (turnMarker != null)
+            turnMarker.SetHouseTurnPosition();
 
         if (house != null)
         {
@@ -266,6 +266,8 @@ public class DB_GameManager : MonoBehaviour
 
     #region Betting
 
+    private bool isBettingMode = true;
+
     public void OnSmallBetSelected()
     {
         if (player == null) return;
@@ -277,8 +279,8 @@ public class DB_GameManager : MonoBehaviour
             return;
         }
 
-        HideBetSelectionPanel();
         Debug.Log($"Player selected small bet: {smallBetAmount}");
+        DeactivateButtonsAndSwitchToGameplay();
         player.OnTurnStart(smallBetAmount);
     }
 
@@ -292,9 +294,47 @@ public class DB_GameManager : MonoBehaviour
             return;
         }
 
-        HideBetSelectionPanel();
         Debug.Log($"Player selected large bet: {largeBetAmount}");
+        DeactivateButtonsAndSwitchToGameplay();
         player.OnTurnStart(largeBetAmount);
+    }
+    
+    private void DeactivateButtonsAndSwitchToGameplay()
+    {
+        StartCoroutine(DeactivateAndReactivateButtons());
+    }
+    
+    private IEnumerator DeactivateAndReactivateButtons()
+    {
+        // Deactivate buttons
+        if (buttonLeft != null)
+            buttonLeft.DeactivateButton();
+        if (buttonRight != null)
+            buttonRight.DeactivateButton();
+        
+        // Wait a bit for deactivation animation
+        yield return new WaitForSeconds(0.6f);
+        
+        // Switch to gameplay mode
+        isBettingMode = false;
+        
+        // Update button texts
+        if (buttonLeft != null)
+            buttonLeft.SetButtonText("Stand");
+        if (buttonRight != null)
+            buttonRight.SetButtonText("Roll");
+        
+        // Set new button actions for gameplay
+        if (buttonLeft != null)
+            buttonLeft.SetButtonAction(() => { if (player != null) player.Stand(); });
+        if (buttonRight != null)
+            buttonRight.SetButtonAction(() => { if (player != null) player.RollDice(); });
+        
+        // Reactivate buttons
+        if (buttonLeft != null)
+            buttonLeft.ActivateButton();
+        if (buttonRight != null)
+            buttonRight.ActivateButton();
     }
 
     public void OnStartNewRound()
@@ -315,8 +355,6 @@ public class DB_GameManager : MonoBehaviour
         if (scoreText != null)
             scoreText.text = "";
         currentTurnTotal = 0;
-        
-        //StartPlayerTurn();
     }
 
     private IEnumerator StartNewRoundAfterDelay()
@@ -336,15 +374,25 @@ public class DB_GameManager : MonoBehaviour
         ResetGameState();
         ResetPlayers();
         RefreshDiceIdlePositions();
+        
+        // Reinitialize and show bet selection
+        roundManager.InitializeRound();
+        ShowBetSelectionPanel();
     }
 
     private void ResetGameState()
     {
         currentTurn = TurnState.PlayerTurn;
         isProcessingTurn = false;
+        isBettingMode = true;
         
-        HideBetSelectionPanel();
         HideGameOverPanel();
+        
+        // Reset buttons for betting
+        if (buttonLeft != null)
+            buttonLeft.DeactivateButton();
+        if (buttonRight != null)
+            buttonRight.DeactivateButton();
     }
 
     private void ResetPlayers()
@@ -377,14 +425,32 @@ public class DB_GameManager : MonoBehaviour
 
     private void ShowBetSelectionPanel()
     {
-        if (betSelectionPanel != null)
-            betSelectionPanel.SetActive(true);
-    }
-
-    private void HideBetSelectionPanel()
-    {
-        if (betSelectionPanel != null)
-            betSelectionPanel.SetActive(false);
+        isBettingMode = true;
+        
+        // Position turn marker to player
+        if (turnMarker != null)
+            turnMarker.SetPlayerTurnPosition();
+        
+        // Show button panel first
+        ShowButtonPanel();
+        
+        // Update button texts for betting
+        if (buttonLeft != null)
+            buttonLeft.SetButtonText("Small Bet\n$" + smallBetAmount);
+        if (buttonRight != null)
+            buttonRight.SetButtonText("Large Bet\n$" + largeBetAmount);
+        
+        // Set button actions for betting
+        if (buttonLeft != null)
+            buttonLeft.SetButtonAction(OnSmallBetSelected);
+        if (buttonRight != null)
+            buttonRight.SetButtonAction(OnLargeBetSelected);
+        
+        // Activate buttons
+        if (buttonLeft != null)
+            buttonLeft.ActivateButton();
+        if (buttonRight != null)
+            buttonRight.ActivateButton();
     }
 
     private void ShowGameOverPanel()

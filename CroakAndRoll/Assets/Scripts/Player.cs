@@ -6,9 +6,7 @@ using UnityEngine.UI;
 public class Player : MonoBehaviour
 {
     [Header("UI Elements")]
-    [SerializeField] private TextMeshProUGUI moneyText;
-    [SerializeField] private Button rollButton;
-    [SerializeField] private Button standButton;
+    [SerializeField] private UI_MoneyController moneyController;
 
     [Header("Input Settings")]
     [SerializeField] private KeyCode rollKey = KeyCode.Space;
@@ -29,33 +27,14 @@ public class Player : MonoBehaviour
     {
         gameManager = FindFirstObjectByType<DB_GameManager>();
         currentMoney = startingMoney;
-        UpdateMoneyUI();
         
-        // Setup button listeners
-        if (rollButton != null)
-        {
-            rollButton.onClick.AddListener(RollDice);
-        }
-        
-        if (standButton != null)
-        {
-            standButton.onClick.AddListener(Stand);
-        }
+        if (moneyController != null)
+            moneyController.SetMoneyValue(currentMoney);
     }
 
     void Update()
     {
         if (!canAct || gameManager == null) return;
-
-        if (Input.GetKeyDown(rollKey) && !gameManager.IsDiceRolling())
-        {
-            RollDice();
-        }
-
-        if (Input.GetKeyDown(standKey) && !gameManager.IsDiceRolling())
-        {
-            Stand();
-        }
     }
 
     public void RollDice()
@@ -163,9 +142,9 @@ public class Player : MonoBehaviour
 
     private void UpdateMoneyUI()
     {
-        if (moneyText != null)
+        if (moneyController != null)
         {
-            moneyText.text = $"${currentMoney}";
+            moneyController.SetMoneyValue(currentMoney);
         }
     }
 
