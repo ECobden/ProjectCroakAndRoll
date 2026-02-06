@@ -39,19 +39,39 @@ public class House : MonoBehaviour
         targetValue = player != null ? player.GetTurnValue() : 0;
         
         Debug.Log($"House turn started - Must beat {targetValue}");
+        
+        if (gameManager == null)
+        {
+            Debug.LogError("GameManager is null in House.OnTurnStart! Cannot proceed.");
+            return;
+        }
+        
         StartCoroutine(AutoRollAfterDelay());
     }
 
     private IEnumerator AutoRollAfterDelay()
     {
+        Debug.Log($"House will roll after {autoRollDelay} seconds");
         yield return new WaitForSeconds(autoRollDelay);
+        Debug.Log("House is now rolling dice");
         RollDice();
     }
 
     public void RollDice()
     {
-        if (gameManager == null || gameManager.IsDiceRolling()) return;
+        if (gameManager == null)
+        {
+            Debug.LogError("GameManager is null in House.RollDice!");
+            return;
+        }
         
+        if (gameManager.IsDiceRolling())
+        {
+            Debug.LogWarning("House.RollDice called but dice are already rolling");
+            return;
+        }
+        
+        Debug.Log("House calling RollSharedDice");
         gameManager.RollSharedDice(OnDiceRolled, false); // false = house turn
     }
 

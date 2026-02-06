@@ -8,10 +8,6 @@ public class Player : MonoBehaviour
     [Header("UI Elements")]
     [SerializeField] private UI_MoneyController moneyController;
 
-    [Header("Input Settings")]
-    [SerializeField] private KeyCode rollKey = KeyCode.Space;
-    [SerializeField] private KeyCode standKey = KeyCode.S;
-
     [Header("Money System")]
     [SerializeField] private int startingMoney = 1000;
     private int betAmount = 100;
@@ -58,6 +54,11 @@ public class Player : MonoBehaviour
         {
             canAct = false;
             Debug.Log("Player BUST! Turn value exceeded 21.");
+            
+            // Disable buttons on bust
+            if (gameManager != null)
+                gameManager.DisableGameplayButtons();
+            
             OnBust();
         }
         else if (turnValue == 21)
@@ -111,16 +112,31 @@ public class Player : MonoBehaviour
 
     public void Stand()
     {
-        if (!canAct || (gameManager != null && gameManager.IsDiceRolling())) return;
+        if (!canAct)
+        {
+            Debug.LogWarning("Stand called but canAct is false. Ignoring.");
+            return;
+        }
+        
+        if (gameManager != null && gameManager.IsDiceRolling())
+        {
+            Debug.LogWarning("Stand called but dice are still rolling. Ignoring.");
+            return;
+        }
 
         canAct = false;
         Debug.Log($"Player stands with {turnValue}");
-
-        // Move dice back to idle positions
+        
+        // Disable buttons when standing
         if (gameManager != null)
         {
+            gameManager.DisableGameplayButtons();
             gameManager.RefreshDiceIdlePositions();
             gameManager.EndPlayerTurn();
+        }
+        else
+        {
+            Debug.LogError("GameManager is null! Cannot end turn.");
         }
     }
 

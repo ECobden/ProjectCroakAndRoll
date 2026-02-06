@@ -58,7 +58,7 @@ public class UI_ButtonController : MonoBehaviour, IPointerEnterHandler, IPointer
     {
         if (isAnimating || !isActive) return;
         
-        Debug.Log($"Pointer entered: {gameObject.name}");
+        //Debug.Log($"Pointer entered: {gameObject.name}");
         isHovering = true;
         if (!isPressed && !isDisabled)
         {
@@ -70,16 +70,10 @@ public class UI_ButtonController : MonoBehaviour, IPointerEnterHandler, IPointer
     // Called when the pointer exits the button area
     public void OnPointerExit(PointerEventData eventData)
     {
-        Debug.Log($"Pointer exited: {gameObject.name}");
+        //Debug.Log($"Pointer exited: {gameObject.name}");
         isHovering = false;
         
-        if (isDisabled)
-        {
-            // Re-enable the button and reset position
-            isDisabled = false;
-            targetPosition = originalPosition;
-        }
-        else if (!isPressed)
+        if (!isPressed && !isDisabled)
         {
             targetPosition = originalPosition;
         }
@@ -90,7 +84,7 @@ public class UI_ButtonController : MonoBehaviour, IPointerEnterHandler, IPointer
     {
         if (isDisabled || isAnimating || !isActive) return;
         
-        Debug.Log($"Button pressed: {gameObject.name}");
+        //Debug.Log($"Button pressed: {gameObject.name}");
         isPressed = true;
         targetPosition = originalPosition + new Vector3(0, -clickDownAmount, 0);
     }
@@ -100,7 +94,7 @@ public class UI_ButtonController : MonoBehaviour, IPointerEnterHandler, IPointer
     {
         if (isDisabled || isAnimating || !isActive) return;
         
-        Debug.Log($"Button released: {gameObject.name}");
+        //Debug.Log($"Button released: {gameObject.name}");
         isPressed = false;
         isDisabled = true;
         
@@ -197,5 +191,31 @@ public class UI_ButtonController : MonoBehaviour, IPointerEnterHandler, IPointer
         {
             buttonText.text = text;
         }
+    }
+    
+    public void EnableButton()
+    {
+        //Debug.Log($"Enabling button: {gameObject.name}");
+        isDisabled = false;
+        if (!isPressed && !isHovering)
+        {
+            targetPosition = originalPosition;
+        }
+    }
+    
+    public void DisableButton()
+    {
+        if (!isActive || isAnimating) return;
+        
+        //Debug.Log($"Disabling button: {gameObject.name}");
+        isDisabled = true;
+        isPressed = false;
+        isHovering = false;
+        targetPosition = originalPosition;
+    }
+    
+    public bool IsButtonDisabled()
+    {
+        return isDisabled;
     }
 }

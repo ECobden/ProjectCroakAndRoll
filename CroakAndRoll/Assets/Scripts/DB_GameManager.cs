@@ -136,7 +136,11 @@ public class DB_GameManager : MonoBehaviour
 
     public void StartPlayerTurn()
     {
-        if (isProcessingTurn) return;
+        if (currentTurn == TurnState.PlayerTurn)
+        {
+            Debug.LogWarning("StartPlayerTurn called but already in PlayerTurn. Ignoring.");
+            return;
+        }
 
         currentTurn = TurnState.PlayerTurn;
         currentTurnTotal = 0;
@@ -149,15 +153,31 @@ public class DB_GameManager : MonoBehaviour
 
     public void EndPlayerTurn()
     {
-        if (currentTurn != TurnState.PlayerTurn || isProcessingTurn) return;
+        if (currentTurn != TurnState.PlayerTurn) 
+        {
+            Debug.LogWarning($"EndPlayerTurn called but currentTurn is {currentTurn}, not PlayerTurn. Ignoring.");
+            return;
+        }
+        
+        if (isProcessingTurn)
+        {
+            Debug.LogWarning("EndPlayerTurn called but already processing turn transition. Ignoring.");
+            return;
+        }
 
         Debug.Log("Player's turn ended");
+        isProcessingTurn = true;
         StartHouseTurn();
+        isProcessingTurn = false;
     }
 
     public void StartHouseTurn()
     {
-        if (isProcessingTurn) return;
+        if (currentTurn == TurnState.HouseTurn)
+        {
+            Debug.LogWarning("StartHouseTurn called but already in HouseTurn. Ignoring.");
+            return;
+        }
 
         currentTurn = TurnState.HouseTurn;
         currentTurnTotal = 0;
@@ -176,14 +196,30 @@ public class DB_GameManager : MonoBehaviour
         {
             house.OnTurnStart();
         }
+        else
+        {
+            Debug.LogError("House is null! Cannot start house turn.");
+        }
     }
 
     public void EndHouseTurn()
     {
-        if (currentTurn != TurnState.HouseTurn || isProcessingTurn) return;
+        if (currentTurn != TurnState.HouseTurn)
+        {
+            Debug.LogWarning($"EndHouseTurn called but currentTurn is {currentTurn}, not HouseTurn. Ignoring.");
+            return;
+        }
+        
+        if (isProcessingTurn)
+        {
+            Debug.LogWarning("EndHouseTurn called but already processing turn transition. Ignoring.");
+            return;
+        }
 
         Debug.Log("House's turn ended");
+        isProcessingTurn = true;
         StartPlayerTurn();
+        isProcessingTurn = false;
     }
     
     #endregion
@@ -330,11 +366,16 @@ public class DB_GameManager : MonoBehaviour
         if (buttonRight != null)
             buttonRight.SetButtonAction(() => { if (player != null) player.RollDice(); });
         
-        // Reactivate buttons
+        // Activate buttons
         if (buttonLeft != null)
             buttonLeft.ActivateButton();
         if (buttonRight != null)
             buttonRight.ActivateButton();
+        
+        // Stand button should start disabled (player hasn't rolled yet)
+        yield return new WaitForSeconds(0.1f); // Wait for activation animation
+        if (buttonLeft != null)
+            buttonLeft.DisableButton();
     }
 
     public void OnStartNewRound()
@@ -451,6 +492,12 @@ public class DB_GameManager : MonoBehaviour
             buttonLeft.ActivateButton();
         if (buttonRight != null)
             buttonRight.ActivateButton();
+        
+        // Ensure buttons are enabled (in case they were already active from previous round)
+        if (buttonLeft != null)
+            buttonLeft.EnableButton();
+        if (buttonRight != null)
+            buttonRight.EnableButton();
     }
 
     private void ShowGameOverPanel()
@@ -593,6 +640,15 @@ public class DB_GameManager : MonoBehaviour
     private IEnumerator RollDiceCoroutine(System.Action<int, int> onComplete, bool isPlayerTurn)
     {
         isDiceRolling = true;
+        
+        // Disable both buttons during rolling
+        if (!isBettingMode && isPlayerTurn)
+        {
+            if (buttonLeft != null)
+                buttonLeft.DisableButton();
+            if (buttonRight != null)
+                buttonRight.DisableButton();
+        }
 
         // Get appropriate launch positions based on turn
         Vector3 launchPosA = isPlayerTurn ? GetIdlePosition(playerLaunchPositionA) : GetIdlePosition(houseLaunchPositionA);
@@ -617,6 +673,15 @@ public class DB_GameManager : MonoBehaviour
         int diceBValue = diceControllerB != null ? diceControllerB.GetLastRollValue() : 0;
 
         isDiceRolling = false;
+        
+        // Re-enable buttons after dice finish rolling (for player turn only)
+        if (!isBettingMode && isPlayerTurn)
+        {
+            if (buttonLeft != null)
+                buttonLeft.EnableButton();
+            if (buttonRight != null)
+                buttonRight.EnableButton();
+        }
 
         // Callback with results
         onComplete?.Invoke(diceAValue, diceBValue);
@@ -633,6 +698,16 @@ public class DB_GameManager : MonoBehaviour
     public bool IsHouseTurn() => currentTurn == TurnState.HouseTurn;
 
     public bool IsDiceRolling() => isDiceRolling;
+    
+    public void DisableGameplayButtons()
+    {
+        if (isBettingMode) return;
+        
+        if (buttonLeft != null)
+            buttonLeft.DisableButton();
+        if (buttonRight != null)
+            buttonRight.DisableButton();
+    }
     
     #endregion
 }
