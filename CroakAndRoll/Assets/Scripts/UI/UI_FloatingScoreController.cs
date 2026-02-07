@@ -53,6 +53,12 @@ public class UI_FloatingScoreController : MonoBehaviour
 
     public void UpdateScore(int turnTotal, bool isPlayerTurn)
     {
+        // Detect turn switch: if turnTotal is less than currentTurnTotal, we've started a new turn
+        if (turnTotal < currentTurnTotal)
+        {
+            currentTurnTotal = 0;
+        }
+        
         // Calculate the roll value (difference from previous total)
         int rollValue = turnTotal - currentTurnTotal;
         currentTurnTotal = turnTotal;

@@ -36,7 +36,7 @@ public class House : MonoBehaviour
     {
         turnValue = 0;
         lastRollValue = 0;
-        UpdateTurnValueUI();
+        //UpdateTurnValueUI();
         
         // Get player's final score as target
         Player player = FindFirstObjectByType<Player>();
@@ -92,12 +92,14 @@ public class House : MonoBehaviour
         if (turnValue > 21)
         {
             Debug.Log("House BUST! House exceeded 21.");
-            OnBust();
+            // Delay before ending turn to let UI animation finish
+            StartCoroutine(DelayedBust());
         }
         else if (turnValue >= targetValue)
         {
             Debug.Log($"House wins with {turnValue} (matched or beat player's {targetValue})");
-            OnWin();
+            // Delay before ending turn to let UI animation finish
+            StartCoroutine(DelayedWin());
         }
         else
         {
@@ -111,6 +113,20 @@ public class House : MonoBehaviour
     {
         yield return new WaitForSeconds(autoRollDelay);
         RollDice();
+    }
+
+    private IEnumerator DelayedBust()
+    {
+        // Wait to allow score callout animation to finish
+        yield return new WaitForSeconds(0.8f);
+        OnBust();
+    }
+
+    private IEnumerator DelayedWin()
+    {
+        // Wait to allow score callout animation to finish
+        yield return new WaitForSeconds(0.8f);
+        OnWin();
     }
 
     public int GetTurnValue()

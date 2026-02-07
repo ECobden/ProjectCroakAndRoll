@@ -65,13 +65,29 @@ public class Player : MonoBehaviour
             if (gameManager != null)
                 gameManager.DisableGameplayButtons();
             
-            OnBust();
+            // Delay before ending turn to let UI animation finish
+            StartCoroutine(DelayedBust());
         }
         else if (turnValue == 21)
         {
             Debug.Log("Player hit 21! Perfect score. Auto-standing...");
-            Stand();
+            // Delay before standing to let UI animation finish
+            StartCoroutine(DelayedStand());
         }
+    }
+
+    private IEnumerator DelayedBust()
+    {
+        // Wait to allow score callout animation to finish
+        yield return new WaitForSeconds(0.8f);
+        OnBust();
+    }
+
+    private IEnumerator DelayedStand()
+    {
+        // Wait to allow score callout animation to finish
+        yield return new WaitForSeconds(0.8f);
+        Stand();
     }
 
     public void OnTurnStart(int selectedBetAmount)
@@ -80,7 +96,12 @@ public class Player : MonoBehaviour
         lastRollValue = 0;
         canAct = true;
         hasRolledThisTurn = false;
-        UpdateTurnValueUI();
+        
+        // Hide stand value UI at start of new turn
+        if (uiManager != null)
+            uiManager.HideStandValue();
+        
+        //UpdateTurnValueUI();
         
         // Update the bet amount
         betAmount = selectedBetAmount;
@@ -147,6 +168,10 @@ public class Player : MonoBehaviour
 
         canAct = false;
         Debug.Log($"Player stands with {turnValue}");
+        
+        // Show stand value UI
+        if (uiManager != null)
+            uiManager.ShowStandValue($"{turnValue}");
         
         // Disable buttons when standing
         if (gameManager != null)

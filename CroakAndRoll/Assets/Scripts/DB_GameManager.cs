@@ -305,6 +305,7 @@ public class DB_GameManager : MonoBehaviour
         currentTurn = TurnState.PlayerTurn;
         isBettingMode = true;
 
+        uiManager.HideStandValue();
         roundManager.CountUpRound();
 
         ShowBetSelectionPanel();

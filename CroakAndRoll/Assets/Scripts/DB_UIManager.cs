@@ -14,6 +14,7 @@ public class DB_UIManager : MonoBehaviour
     [SerializeField] private UI_ButtonController buttonLeft;
     [SerializeField] private UI_ButtonController buttonRight;
     [SerializeField] private UI_FloatingScoreController floatingScoreController;
+    [SerializeField] private UI_StandValueController standValueController;
     [SerializeField] private TextMeshProUGUI goalText;
     [SerializeField] private GameObject gameOverPanel;
     [SerializeField] private Button restartButton;
@@ -222,6 +223,18 @@ public class DB_UIManager : MonoBehaviour
     {
         if (floatingScoreController != null)
             floatingScoreController.UpdateScore(turnTotal, isPlayerTurn);
+    }
+
+    public void ShowStandValue(string value)
+    {
+        if (standValueController != null)
+            standValueController.Show(value);
+    }
+
+    public void HideStandValue()
+    {
+        if (standValueController != null)
+            standValueController.Hide();
     }
 
     #endregion
