@@ -36,7 +36,12 @@ public class House : MonoBehaviour
     {
         turnValue = 0;
         lastRollValue = 0;
-        //UpdateTurnValueUI();
+        
+        // Reset roll progress for house turn
+        if (uiManager != null)
+        {
+            uiManager.ResetGoalRollProgress();
+        }
         
         // Get player's final score as target
         Player player = FindFirstObjectByType<Player>();
@@ -92,12 +97,33 @@ public class House : MonoBehaviour
         if (turnValue > 21)
         {
             Debug.Log("House BUST! House exceeded 21.");
+            
+            // Show bust message
+            if (uiManager != null)
+                uiManager.ShowHouseBust();
+            
             // Delay before ending turn to let UI animation finish
             StartCoroutine(DelayedBust());
+        }
+        else if (turnValue == 21)
+        {
+            Debug.Log($"House hits 21!");
+            
+            // Show 21 message
+            if (uiManager != null)
+                uiManager.ShowHouse21();
+            
+            // Delay before ending turn to let UI animation finish
+            StartCoroutine(DelayedWin());
         }
         else if (turnValue >= targetValue)
         {
             Debug.Log($"House wins with {turnValue} (matched or beat player's {targetValue})");
+            
+            // Show house wins message
+            if (uiManager != null)
+                uiManager.ShowHouseWins();
+            
             // Delay before ending turn to let UI animation finish
             StartCoroutine(DelayedWin());
         }
@@ -117,15 +143,17 @@ public class House : MonoBehaviour
 
     private IEnumerator DelayedBust()
     {
-        // Wait to allow score callout animation to finish
-        yield return new WaitForSeconds(0.8f);
+        // Wait for score animation to complete
+        float animationDuration = uiManager != null ? uiManager.GetScoreAnimationDuration(lastRollValue) : 0.8f;
+        yield return new WaitForSeconds(animationDuration);
         OnBust();
     }
 
     private IEnumerator DelayedWin()
     {
-        // Wait to allow score callout animation to finish
-        yield return new WaitForSeconds(0.8f);
+        // Wait for score animation to complete
+        float animationDuration = uiManager != null ? uiManager.GetScoreAnimationDuration(lastRollValue) : 0.8f;
+        yield return new WaitForSeconds(animationDuration);
         OnWin();
     }
 
@@ -150,6 +178,10 @@ public class House : MonoBehaviour
         if (diceManager != null)
             diceManager.RefreshDiceIdlePositions();
         
+        // Show player wins message
+        if (uiManager != null)
+            uiManager.ShowPlayerWins();
+        
         if (gameManager != null)
             gameManager.HouseBust();
     }
@@ -158,6 +190,8 @@ public class House : MonoBehaviour
     {
         if (uiManager != null)
         {
+            // Only update the floating score animation
+            // The goal text will be updated during the score transfer animation
             uiManager.UpdateScoreText(turnValue, false); // false = house turn
         }
     }

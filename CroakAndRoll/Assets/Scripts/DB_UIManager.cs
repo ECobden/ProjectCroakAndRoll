@@ -15,7 +15,8 @@ public class DB_UIManager : MonoBehaviour
     [SerializeField] private UI_ButtonController buttonRight;
     [SerializeField] private UI_FloatingScoreController floatingScoreController;
     [SerializeField] private UI_StandValueController standValueController;
-    [SerializeField] private TextMeshProUGUI goalText;
+    [SerializeField] private UI_GoalTextController goalTextController;
+    [SerializeField] private UI_RoundResultController roundResultController;
     [SerializeField] private GameObject gameOverPanel;
     [SerializeField] private Button restartButton;
     [SerializeField] private TurnMarker turnMarker;
@@ -209,8 +210,20 @@ public class DB_UIManager : MonoBehaviour
 
     public void UpdateGoalText(string text)
     {
-        if (goalText != null)
-            goalText.text = text;
+        if (goalTextController != null)
+            goalTextController.SetGoalText(text);
+    }
+
+    public void UpdateGoalRollProgress(int currentValue, bool isPlayerTurn)
+    {
+        if (goalTextController != null)
+            goalTextController.UpdateRollProgress(currentValue, isPlayerTurn);
+    }
+
+    public void ResetGoalRollProgress()
+    {
+        if (goalTextController != null)
+            goalTextController.ResetRollProgress();
     }
 
     public void ClearScoreText()
@@ -235,6 +248,60 @@ public class DB_UIManager : MonoBehaviour
     {
         if (standValueController != null)
             standValueController.Hide();
+    }
+
+    public float GetScoreAnimationDuration(int rollValue)
+    {
+        if (floatingScoreController != null)
+            return floatingScoreController.GetScoreTransferDuration(rollValue);
+        return 0f;
+    }
+
+    public bool IsScoreAnimating()
+    {
+        if (floatingScoreController != null)
+            return floatingScoreController.IsAnimating();
+        return false;
+    }
+
+    #endregion
+
+    #region Round Result Messages
+
+    public void ShowPlayerBust()
+    {
+        if (roundResultController != null)
+            roundResultController.ShowPlayerBust();
+    }
+
+    public void ShowHouseBust()
+    {
+        if (roundResultController != null)
+            roundResultController.ShowHouseBust();
+    }
+
+    public void ShowPlayer21()
+    {
+        if (roundResultController != null)
+            roundResultController.ShowPlayer21();
+    }
+
+    public void ShowHouse21()
+    {
+        if (roundResultController != null)
+            roundResultController.ShowHouse21();
+    }
+
+    public void ShowHouseWins()
+    {
+        if (roundResultController != null)
+            roundResultController.ShowHouseWins();
+    }
+
+    public void ShowPlayerWins()
+    {
+        if (roundResultController != null)
+            roundResultController.ShowPlayerWins();
     }
 
     #endregion

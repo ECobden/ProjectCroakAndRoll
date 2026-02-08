@@ -93,14 +93,14 @@ public class DB_DiceManager : MonoBehaviour
 
     #region Dice Rolling
 
-    public void RollDice(System.Action<int, int> onComplete, bool isPlayerTurn)
+    public IEnumerator RollDiceAndGetResults(System.Action<int, int> onComplete, bool isPlayerTurn)
     {
-        if (isDiceRolling) return;
-        StartCoroutine(RollDiceCoroutine(onComplete, isPlayerTurn));
-    }
+        if (isDiceRolling)
+        {
+            Debug.LogWarning("Dice are already rolling!");
+            yield break;
+        }
 
-    private IEnumerator RollDiceCoroutine(System.Action<int, int> onComplete, bool isPlayerTurn)
-    {
         isDiceRolling = true;
 
         // Get appropriate launch positions based on turn
@@ -127,8 +127,15 @@ public class DB_DiceManager : MonoBehaviour
 
         isDiceRolling = false;
 
-        // Callback with results
+        // Return results via callback
         onComplete?.Invoke(diceAValue, diceBValue);
+    }
+
+    // Legacy method for backward compatibility - can be removed if not used elsewhere
+    public void RollDice(System.Action<int, int> onComplete, bool isPlayerTurn)
+    {
+        if (isDiceRolling) return;
+        StartCoroutine(RollDiceAndGetResults(onComplete, isPlayerTurn));
     }
 
     #endregion

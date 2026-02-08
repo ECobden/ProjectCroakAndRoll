@@ -8,11 +8,14 @@ public class DB_GameManager : MonoBehaviour
 {
     #region Enums
     
-    public enum TurnState
+    public enum GameState
     {
-        PlayerTurn,
-        HouseTurn,
-        GameOver
+        BettingPhase,      // Player selecting bet
+        PlayerTurn,        // Player rolling dice
+        PlayerStanding,    // Player has stood, transitioning to house
+        HouseTurn,         // House rolling dice
+        RoundOver,         // Round ending, determining winner
+        GameOver           // Game completely over
     }
     
     #endregion
@@ -42,9 +45,7 @@ public class DB_GameManager : MonoBehaviour
 
     #region Private Fields
     
-    private TurnState currentTurn = TurnState.PlayerTurn;
-    private bool isProcessingTurn = false;
-    private bool isBettingMode = true;
+    private GameState currentState = GameState.BettingPhase;
     
     #endregion
 
@@ -85,18 +86,115 @@ public class DB_GameManager : MonoBehaviour
     
     #endregion
 
-    #region Turn Management
+    #region State Management
 
-    public void StartPlayerTurn()
+    private void TransitionToState(GameState newState)
     {
-        if (currentTurn == TurnState.PlayerTurn)
+        if (currentState == newState)
         {
-            Debug.LogWarning("StartPlayerTurn called but already in PlayerTurn. Ignoring.");
+            Debug.LogWarning($"Already in state {newState}");
             return;
         }
 
-        currentTurn = TurnState.PlayerTurn;
+        Debug.Log($"State Transition: {currentState} -> {newState}");
         
+        // Exit current state
+        ExitState(currentState);
+        
+        // Update state
+        GameState previousState = currentState;
+        currentState = newState;
+        
+        // Enter new state
+        EnterState(newState, previousState);
+    }
+
+    private void ExitState(GameState state)
+    {
+        switch (state)
+        {
+            case GameState.BettingPhase:
+                // Clear bet UI
+                break;
+                
+            case GameState.PlayerTurn:
+                if (uiManager != null)
+                    uiManager.DisableGameplayButtons();
+                break;
+                
+            case GameState.HouseTurn:
+                if (uiManager != null)
+                    uiManager.ClearScoreText();
+                break;
+                
+            case GameState.RoundOver:
+                // Reset goal text state for new round
+                if (uiManager != null)
+                    uiManager.ResetGoalRollProgress();
+                break;
+        }
+    }
+
+    private void EnterState(GameState state, GameState previousState)
+    {
+        switch (state)
+        {
+            case GameState.BettingPhase:
+                ShowBetSelectionPanel();
+                break;
+                
+            case GameState.PlayerTurn:
+                // If coming from betting, need to switch UI first
+                if (previousState == GameState.BettingPhase)
+                {
+                    StartCoroutine(TransitionFromBettingToPlayerTurn());
+                }
+                else
+                {
+                    StartPlayerTurnInternal();
+                }
+                break;
+                
+            case GameState.PlayerStanding:
+                // Brief transition state before house turn
+                TransitionToState(GameState.HouseTurn);
+                break;
+                
+            case GameState.HouseTurn:
+                StartHouseTurnInternal();
+                break;
+                
+            case GameState.RoundOver:
+                HandleRoundOver();
+                break;
+                
+            case GameState.GameOver:
+                if (uiManager != null)
+                    uiManager.ShowGameOverPanel();
+                break;
+        }
+    }
+    
+    private IEnumerator TransitionFromBettingToPlayerTurn()
+    {
+        if (uiManager == null) yield break;
+        
+        // Switch UI buttons with animation
+        yield return StartCoroutine(uiManager.SwitchToGameplayButtons(
+            () => { if (player != null) player.Stand(); },
+            () => { if (player != null) player.RollDice(); }
+        ));
+        
+        // UI is ready, now start the turn
+        StartPlayerTurnInternal();
+    }
+    
+    #endregion
+
+    #region Turn Management
+
+    private void StartPlayerTurnInternal()
+    {
         if (uiManager != null)
         {
             uiManager.UpdateGoalText("Roll Closest to 21");
@@ -104,37 +202,25 @@ public class DB_GameManager : MonoBehaviour
         }
     }
 
+    public void StartPlayerTurn()
+    {
+        TransitionToState(GameState.PlayerTurn);
+    }
+
     public void EndPlayerTurn()
     {
-        if (currentTurn != TurnState.PlayerTurn) 
+        if (currentState != GameState.PlayerTurn)
         {
-            Debug.LogWarning($"EndPlayerTurn called but currentTurn is {currentTurn}, not PlayerTurn. Ignoring.");
-            return;
-        }
-        
-        if (isProcessingTurn)
-        {
-            Debug.LogWarning("EndPlayerTurn called but already processing turn transition. Ignoring.");
+            Debug.LogWarning($"EndPlayerTurn called but not in PlayerTurn state. Current: {currentState}");
             return;
         }
 
         Debug.Log("Player's turn ended");
-        isProcessingTurn = true;
-        StartHouseTurn();
-        isProcessingTurn = false;
+        TransitionToState(GameState.PlayerStanding);
     }
 
-    public void StartHouseTurn()
+    private void StartHouseTurnInternal()
     {
-        if (currentTurn == TurnState.HouseTurn)
-        {
-            Debug.LogWarning("StartHouseTurn called but already in HouseTurn. Ignoring.");
-            return;
-        }
-
-        currentTurn = TurnState.HouseTurn;
-        Debug.Log("House's turn");
-
         if (player != null && uiManager != null)
         {
             int playerScore = player.GetTurnValue();
@@ -154,24 +240,21 @@ public class DB_GameManager : MonoBehaviour
         }
     }
 
+    public void StartHouseTurn()
+    {
+        TransitionToState(GameState.HouseTurn);
+    }
+
     public void EndHouseTurn()
     {
-        if (currentTurn != TurnState.HouseTurn)
+        if (currentState != GameState.HouseTurn)
         {
-            Debug.LogWarning($"EndHouseTurn called but currentTurn is {currentTurn}, not HouseTurn. Ignoring.");
-            return;
-        }
-        
-        if (isProcessingTurn)
-        {
-            Debug.LogWarning("EndHouseTurn called but already processing turn transition. Ignoring.");
+            Debug.LogWarning($"EndHouseTurn called but not in HouseTurn state. Current: {currentState}");
             return;
         }
 
         Debug.Log("House's turn ended");
-        isProcessingTurn = true;
-        StartPlayerTurn();
-        isProcessingTurn = false;
+        TransitionToState(GameState.RoundOver);
     }
     
     #endregion
@@ -185,7 +268,7 @@ public class DB_GameManager : MonoBehaviour
         if (uiManager != null)
             uiManager.ClearScoreText();
         
-        CheckGameOver();
+        TransitionToState(GameState.RoundOver);
     }
 
     public void HouseBust()
@@ -202,7 +285,7 @@ public class DB_GameManager : MonoBehaviour
         if (uiManager != null)
             uiManager.ClearScoreText();
         
-        CheckGameOver();
+        TransitionToState(GameState.RoundOver);
     }
 
     public void HouseWins()
@@ -212,41 +295,33 @@ public class DB_GameManager : MonoBehaviour
         if (uiManager != null)
             uiManager.ClearScoreText();
         
-        CheckGameOver();
+        TransitionToState(GameState.RoundOver);
     }
 
     public void PlayerOutOfMoney()
     {
         Debug.Log("GAME OVER - Player is out of money!");
-        currentTurn = TurnState.GameOver;
-        
-        if (uiManager != null)
-            uiManager.ShowGameOverPanel();
+        TransitionToState(GameState.GameOver);
     }
 
-    private void CheckGameOver()
+    private void HandleRoundOver()
     {
+        // Check if game should end completely
         if (player != null && player.GetCurrentMoney() < smallBetAmount)
         {
             Debug.Log("GAME OVER - Player cannot afford even the smallest bet!");
-            currentTurn = TurnState.GameOver;
-            
-            if (uiManager != null)
-                uiManager.ShowGameOverPanel();
+            TransitionToState(GameState.GameOver);
             return;
         }
 
         if (house != null && house.GetCurrentMoney() <= 0)
         {
             Debug.Log("GAME OVER - Player wins! House is out of money!");
-            currentTurn = TurnState.GameOver;
-            
-            if (uiManager != null)
-                uiManager.ShowGameOverPanel();
+            TransitionToState(GameState.GameOver);
             return;
         }
 
-        // If we got here, game is not over - start a new round
+        // Game continues - start a new round after delay
         StartCoroutine(StartNewRoundAfterDelay());
     }
     
@@ -256,6 +331,12 @@ public class DB_GameManager : MonoBehaviour
 
     public void OnSmallBetSelected()
     {
+        if (currentState != GameState.BettingPhase)
+        {
+            Debug.LogWarning($"Bet selected but not in betting phase. Current state: {currentState}");
+            return;
+        }
+
         if (player == null) return;
 
         if (player.GetCurrentMoney() < smallBetAmount)
@@ -266,12 +347,23 @@ public class DB_GameManager : MonoBehaviour
         }
 
         Debug.Log($"Player selected small bet: {smallBetAmount}");
-        StartCoroutine(SwitchToGameplayMode());
-        player.OnTurnStart(smallBetAmount);
+        
+        // Start player's turn with bet amount
+        if (player != null)
+            player.OnTurnStart(smallBetAmount);
+        
+        // Transition to PlayerTurn (which will handle UI switch)
+        TransitionToState(GameState.PlayerTurn);
     }
 
     public void OnLargeBetSelected()
     {
+        if (currentState != GameState.BettingPhase)
+        {
+            Debug.LogWarning($"Bet selected but not in betting phase. Current state: {currentState}");
+            return;
+        }
+
         if (player == null) return;
 
         if (player.GetCurrentMoney() < largeBetAmount)
@@ -281,42 +373,33 @@ public class DB_GameManager : MonoBehaviour
         }
 
         Debug.Log($"Player selected large bet: {largeBetAmount}");
-        StartCoroutine(SwitchToGameplayMode());
-        player.OnTurnStart(largeBetAmount);
-    }
-    
-    private IEnumerator SwitchToGameplayMode()
-    {
-        if (uiManager == null) yield break;
         
-        isBettingMode = false;
+        // Start player's turn with bet amount
+        if (player != null)
+            player.OnTurnStart(largeBetAmount);
         
-        yield return StartCoroutine(uiManager.SwitchToGameplayButtons(
-            () => { if (player != null) player.Stand(); },
-            () => { if (player != null) player.RollDice(); }
-        ));
+        // Transition to PlayerTurn (which will handle UI switch)
+        TransitionToState(GameState.PlayerTurn);
     }
 
     public void OnStartNewRound()
     {
         Debug.Log("Starting new round...");
 
-        // Reset turn state for new round
-        currentTurn = TurnState.PlayerTurn;
-        isBettingMode = true;
-
-        uiManager.HideStandValue();
-        roundManager.CountUpRound();
-
-        ShowBetSelectionPanel();
+        if (uiManager != null)
+            uiManager.HideStandValue();
+            
+        if (roundManager != null)
+            roundManager.CountUpRound();
                
         if (house != null)
-        {
             house.ResetTurnValue();
-        }
         
         if (uiManager != null)
             uiManager.ClearScoreText();
+
+        // Transition to betting phase
+        TransitionToState(GameState.BettingPhase);
     }
 
     private IEnumerator StartNewRoundAfterDelay()
@@ -346,9 +429,7 @@ public class DB_GameManager : MonoBehaviour
 
     private void ResetGameState()
     {
-        currentTurn = TurnState.PlayerTurn;
-        isProcessingTurn = false;
-        isBettingMode = true;
+        currentState = GameState.BettingPhase;
         
         if (uiManager != null)
         {
@@ -375,11 +456,10 @@ public class DB_GameManager : MonoBehaviour
 
     private void ShowBetSelectionPanel()
     {
-        isBettingMode = true;
-        
         if (uiManager != null)
         {
             uiManager.ShowBetSelection(smallBetAmount, largeBetAmount, OnSmallBetSelected, OnLargeBetSelected);
+            uiManager.UpdateGoalText("Select your bet");
         }
     }
     
@@ -390,66 +470,47 @@ public class DB_GameManager : MonoBehaviour
     public void RollSharedDice(System.Action<int, int> onComplete, bool isPlayerTurn)
     {
         if (diceManager == null || diceManager.IsDiceRolling()) return;
-        StartCoroutine(RollDiceCoroutine(onComplete, isPlayerTurn));
+        StartCoroutine(HandleDiceRoll(onComplete, isPlayerTurn));
     }
 
-    private IEnumerator RollDiceCoroutine(System.Action<int, int> onComplete, bool isPlayerTurn)
+    private IEnumerator HandleDiceRoll(System.Action<int, int> onComplete, bool isPlayerTurn)
     {
-        // Disable both buttons during rolling
-        if (!isBettingMode && isPlayerTurn && uiManager != null)
+        // Disable buttons before rolling (player turn only)
+        if (currentState == GameState.PlayerTurn && isPlayerTurn && uiManager != null)
         {
             uiManager.DisableGameplayButtons();
         }
 
-        // Roll dice and wait for callback
-        bool rollComplete = false;
-        int resultA = 0;
-        int resultB = 0;
+        // Let DiceManager handle the rolling and waiting
+        yield return StartCoroutine(diceManager.RollDiceAndGetResults(onComplete, isPlayerTurn));
 
-        diceManager.RollDice((a, b) =>
+        // Re-enable buttons after rolling (player turn only)
+        if (currentState == GameState.PlayerTurn && isPlayerTurn && uiManager != null)
         {
-            resultA = a;
-            resultB = b;
-            rollComplete = true;
-        }, isPlayerTurn);
-
-        // Wait for roll to complete
-        while (!rollComplete)
-        {
-            yield return null;
+            // Only enable Stand button if player has rolled this turn
+            if (player != null && player.HasRolledThisTurn())
+                uiManager.EnableStandButton();
+            uiManager.EnableRollButton();
         }
-
-        // Re-enable buttons after dice finish rolling (for player turn only)
-        if (!isBettingMode && isPlayerTurn)
-        {
-            if (uiManager != null)
-            {
-                // Only enable Stand button if player has rolled this turn
-                if (player != null && player.HasRolledThisTurn())
-                    uiManager.EnableStandButton();
-                uiManager.EnableRollButton();
-            }
-        }
-
-        // Callback with results
-        onComplete?.Invoke(resultA, resultB);
     }
     
     #endregion
 
     #region Public API
 
-    public TurnState GetCurrentTurn() => currentTurn;
+    public GameState GetCurrentState() => currentState;
     
-    public bool IsPlayerTurn() => currentTurn == TurnState.PlayerTurn;
+    public bool IsPlayerTurn() => currentState == GameState.PlayerTurn;
     
-    public bool IsHouseTurn() => currentTurn == TurnState.HouseTurn;
+    public bool IsHouseTurn() => currentState == GameState.HouseTurn;
+    
+    public bool IsBettingPhase() => currentState == GameState.BettingPhase;
 
     public bool IsDiceRolling() => diceManager != null && diceManager.IsDiceRolling();
     
     public void DisableGameplayButtons()
     {
-        if (isBettingMode) return;
+        if (currentState == GameState.BettingPhase) return;
         
         if (uiManager != null)
             uiManager.DisableGameplayButtons();

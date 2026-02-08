@@ -61,6 +61,10 @@ public class Player : MonoBehaviour
             canAct = false;
             Debug.Log("Player BUST! Turn value exceeded 21.");
             
+            // Show bust message
+            if (uiManager != null)
+                uiManager.ShowPlayerBust();
+            
             // Disable buttons on bust
             if (gameManager != null)
                 gameManager.DisableGameplayButtons();
@@ -71,6 +75,11 @@ public class Player : MonoBehaviour
         else if (turnValue == 21)
         {
             Debug.Log("Player hit 21! Perfect score. Auto-standing...");
+            
+            // Show 21 message
+            if (uiManager != null)
+                uiManager.ShowPlayer21();
+            
             // Delay before standing to let UI animation finish
             StartCoroutine(DelayedStand());
         }
@@ -78,15 +87,17 @@ public class Player : MonoBehaviour
 
     private IEnumerator DelayedBust()
     {
-        // Wait to allow score callout animation to finish
-        yield return new WaitForSeconds(0.8f);
+        // Wait for score animation to complete
+        float animationDuration = uiManager != null ? uiManager.GetScoreAnimationDuration(lastRollValue) : 0.8f;
+        yield return new WaitForSeconds(animationDuration);
         OnBust();
     }
 
     private IEnumerator DelayedStand()
     {
-        // Wait to allow score callout animation to finish
-        yield return new WaitForSeconds(0.8f);
+        // Wait for score animation to complete
+        float animationDuration = uiManager != null ? uiManager.GetScoreAnimationDuration(lastRollValue) : 0.8f;
+        yield return new WaitForSeconds(animationDuration);
         Stand();
     }
 
@@ -97,11 +108,13 @@ public class Player : MonoBehaviour
         canAct = true;
         hasRolledThisTurn = false;
         
-        // Hide stand value UI at start of new turn
+        // Hide stand value UI and reset progress at start of new turn
         if (uiManager != null)
+        {
             uiManager.HideStandValue();
-        
-        //UpdateTurnValueUI();
+            uiManager.ResetGoalRollProgress();
+            // Note: Goal text will be updated by GameManager's state transition
+        }
         
         // Update the bet amount
         betAmount = selectedBetAmount;
@@ -201,6 +214,8 @@ public class Player : MonoBehaviour
     {
         if (uiManager != null)
         {
+            // Only update the floating score animation
+            // The goal text will be updated during the score transfer animation
             uiManager.UpdateScoreText(turnValue, true); // true = player turn
         }
     }

@@ -9,7 +9,7 @@ public class UI_FloatingScoreController : MonoBehaviour
 
     [Header("Score Display")]
     [SerializeField] private TextMeshProUGUI scoreText;
-    [SerializeField] private TextMeshProUGUI goalText;
+    [SerializeField] private UI_GoalTextController goalTextController;
     [SerializeField] private RectTransform scoreVisualElement;
 
     [Header("Animation Settings")]
@@ -42,6 +42,13 @@ public class UI_FloatingScoreController : MonoBehaviour
             scoreText.text = "";
         currentTurnTotal = 0;
         
+        // Stop any ongoing score transfer animation
+        if (scoreTransferCoroutine != null)
+        {
+            StopCoroutine(scoreTransferCoroutine);
+            scoreTransferCoroutine = null;
+        }
+        
         // Reset visual element
         if (scoreVisualElement != null)
         {
@@ -49,6 +56,22 @@ public class UI_FloatingScoreController : MonoBehaviour
             scoreVisualElement.localScale = Vector3.zero;
             scoreVisualElement.localRotation = Quaternion.identity;
         }
+    }
+
+    /// <summary>
+    /// Calculates the total duration of the score transfer animation for a given roll value.
+    /// </summary>
+    public float GetScoreTransferDuration(int rollValue)
+    {
+        return scorePunchDuration + scoreTransferDelay + (rollValue * scoreTransferSpeed) + visualElementScaleDuration;
+    }
+
+    /// <summary>
+    /// Returns true if a score transfer animation is currently playing.
+    /// </summary>
+    public bool IsAnimating()
+    {
+        return scoreTransferCoroutine != null;
     }
 
     public void UpdateScore(int turnTotal, bool isPlayerTurn)
@@ -114,8 +137,6 @@ public class UI_FloatingScoreController : MonoBehaviour
 
         // Get starting value for goal text animation (previous total)
         int startingTotal = turnTotal - rollValue;
-        string playerName = isPlayerTurn ? "Player" : "House";
-        bool isFirstRoll = (startingTotal == 0);
 
         // Simultaneously count down score text (roll value) and count up goal text (turn total)
         for (int i = 0; i <= rollValue; i++)
@@ -130,10 +151,9 @@ public class UI_FloatingScoreController : MonoBehaviour
             }
 
             // Update goal text (counting up the turn total)
-            // Only update to X/21 format if not first roll, or on the last iteration of first roll
-            if (goalText != null && (!isFirstRoll || i == rollValue))
+            if (goalTextController != null)
             {
-                goalText.text = $"{playerName}: {currentTotal} / 21";
+                goalTextController.SetRollProgressImmediate(currentTotal, isPlayerTurn);
             }
 
             yield return new WaitForSeconds(scoreTransferSpeed);
