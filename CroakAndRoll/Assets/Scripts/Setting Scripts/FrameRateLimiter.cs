@@ -16,6 +16,8 @@ public class FrameRateLimiter : MonoBehaviour
             Application.targetFrameRate = targetFrameRate;
         // Optionally adjust physics timestep when changing frame rate:
         // Time.fixedDeltaTime = 1f / Mathf.Max(50f, targetFrameRate); // example
+
+        SetTargetFrameRate(targetFrameRate);
     }
 
     // Optional runtime setters
