@@ -46,10 +46,10 @@ MonoBehaviour:
     m_Value: 1
   gaussianStart:
     m_OverrideState: 1
-    m_Value: 20.3
+    m_Value: 2.5
   gaussianEnd:
-    m_OverrideState: 0
-    m_Value: 50
+    m_OverrideState: 1
+    m_Value: 10
   gaussianMaxRadius:
     m_OverrideState: 1
     m_Value: 1.5
