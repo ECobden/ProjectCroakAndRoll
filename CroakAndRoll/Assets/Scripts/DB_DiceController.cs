@@ -228,8 +228,8 @@ public class DB_DiceController : MonoBehaviour
         // Get gravity magnitude
         float gravity = Mathf.Abs(Physics.gravity.y);
         
-        // Use a 45-degree launch angle for good arc trajectory
-        float launchAngle = 45f * Mathf.Deg2Rad;
+        // Use a low launch angle for direct trajectory
+        float launchAngle = 20f * Mathf.Deg2Rad;
         
         // Calculate required speed to reach target at this angle
         // Using projectile motion equations:
@@ -427,7 +427,7 @@ public class DB_DiceController : MonoBehaviour
     {
         // Visualize idle position
         Gizmos.color = Color.green;
-        Gizmos.DrawSphere(idlePosition, 0.2f);
+        Gizmos.DrawSphere(idlePosition, 0.01f);
         
         // Visualize launch direction toward target area or board center
         if (targetArea != null)
@@ -435,7 +435,7 @@ public class DB_DiceController : MonoBehaviour
             Gizmos.color = Color.cyan;
             Vector3 targetCenter = targetArea.GetCenterPoint();
             Gizmos.DrawLine(idlePosition, targetCenter);
-            Gizmos.DrawSphere(targetCenter, 0.15f);
+            Gizmos.DrawSphere(targetCenter, 0.01f);
         }
         else
         {

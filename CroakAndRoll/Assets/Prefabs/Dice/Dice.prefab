@@ -9,10 +9,10 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 7409675783180187720}
-  - component: {fileID: 371362160916766769}
   - component: {fileID: 5655869547656349788}
   - component: {fileID: 1049975917574152968}
   - component: {fileID: 5837244478513237637}
+  - component: {fileID: 8454965198313270148}
   m_Layer: 6
   m_Name: Dice
   m_TagString: Untagged
@@ -30,34 +30,12 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.3, y: 0.3, z: 0.3}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 1
   m_Children:
   - {fileID: 2209623379073565042}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!64 &371362160916766769
-MeshCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8436088037483572239}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 5
-  m_Convex: 1
-  m_CookingOptions: 30
-  m_Mesh: {fileID: 4300006, guid: f9827c266de1b4a44b3e673a03371546, type: 3}
 --- !u!54 &5655869547656349788
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -66,9 +44,9 @@ Rigidbody:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8436088037483572239}
   serializedVersion: 5
-  m_Mass: 0.1
-  m_LinearDamping: 0
-  m_AngularDamping: 0
+  m_Mass: 0.006
+  m_LinearDamping: 0.02
+  m_AngularDamping: 0.01
   m_CenterOfMass: {x: 0, y: 0, z: 0}
   m_InertiaTensor: {x: 1, y: 1, z: 1}
   m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
@@ -82,9 +60,9 @@ Rigidbody:
   m_ImplicitTensor: 1
   m_UseGravity: 1
   m_IsKinematic: 0
-  m_Interpolate: 0
+  m_Interpolate: 1
   m_Constraints: 0
-  m_CollisionDetection: 0
+  m_CollisionDetection: 1
 --- !u!114 &1049975917574152968
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -99,9 +77,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DB_DiceController
   targetArea: {fileID: 0}
   rollForce: 1
-  rollForceRandomness: 0.5
-  rollTorque: 0.2
-  settleTime: 3
+  rollForceRandomness: 0.1
+  rollTorque: 0.25
+  settleTime: 3.5
   moveLerpDuration: 0.5
   audioSource: {fileID: 5837244478513237637}
   rollSound: {fileID: 0}
@@ -210,6 +188,27 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!65 &8454965198313270148
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8436088037483572239}
+  m_Material: {fileID: 13400000, guid: a9b3c5e7f1d2468a9b5c8e7f3d1a2468, type: 2}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.038, y: 0.038, z: 0.038}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &9128653011140499821
 GameObject:
   m_ObjectHideFlags: 0
@@ -238,8 +237,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 1, y: 0, z: 0, w: 0}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.03, y: 0.03, z: 0.03}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 7409675783180187720}
   m_LocalEulerAnglesHint: {x: 180, y: 0, z: 0}
