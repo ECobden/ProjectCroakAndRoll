@@ -12,7 +12,10 @@ public class DB_DiceController : MonoBehaviour
     [SerializeField] private float rollForce = 5f;
     [SerializeField] private float rollForceRandomness = 0.5f;
     [SerializeField] private float rollTorque = 10f;
-    [SerializeField] private float settleTime = 3f;
+    [SerializeField] private float maxSettleTime = 5f; // Failsafe timeout if dice falls through map
+    [SerializeField] private float settleVelocityThreshold = 0.1f;
+    [SerializeField] private float settleAngularVelocityThreshold = 0.1f;
+    [SerializeField] private float settleDoubleCheckDelay = 0.5f; // Time to wait before confirming dice has stopped
     [SerializeField] private float moveLerpDuration = 0.5f;
 
     [Header("Audio")]
@@ -154,8 +157,46 @@ public class DB_DiceController : MonoBehaviour
         // Apply physics forces from launch position
         ApplyRollForces(launchPosition);
 
-        // Wait for dice to settle
-        yield return new WaitForSeconds(settleTime);
+        // Wait for dice to settle or timeout (failsafe)
+        float elapsedTime = 0f;
+        bool settled = false;
+        
+        while (elapsedTime < maxSettleTime && !settled)
+        {
+            // Check if dice has settled (both linear and angular velocity below threshold)
+            if (rb != null && 
+                rb.linearVelocity.magnitude < settleVelocityThreshold && 
+                rb.angularVelocity.magnitude < settleAngularVelocityThreshold)
+            {
+                // Wait for double-check delay
+                yield return new WaitForSeconds(settleDoubleCheckDelay);
+                elapsedTime += settleDoubleCheckDelay;
+                
+                // Double-check that dice is still settled
+                if (rb != null && 
+                    rb.linearVelocity.magnitude < settleVelocityThreshold && 
+                    rb.angularVelocity.magnitude < settleAngularVelocityThreshold)
+                {
+                    Debug.Log($"Dice settled after {elapsedTime:F2} seconds");
+                    settled = true;
+                }
+                else
+                {
+                    Debug.Log("Dice started moving again during double-check, continuing to monitor...");
+                }
+            }
+
+            if (!settled)
+            {
+                elapsedTime += Time.deltaTime;
+                yield return null;
+            }
+        }
+
+        if (elapsedTime >= maxSettleTime && !settled)
+        {
+            Debug.LogWarning($"Dice settle timeout reached ({maxSettleTime}s) - using failsafe");
+        }
 
         // Determine final value
         int faceValue = GetDiceFaceValue();
