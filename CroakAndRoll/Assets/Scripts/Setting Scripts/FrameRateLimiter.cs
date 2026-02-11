@@ -11,27 +11,48 @@ public class FrameRateLimiter : MonoBehaviour
 
     void Awake()
     {
-        QualitySettings.vSyncCount = useVSync ? vSyncCount : 0;
-        if (!useVSync)
-            Application.targetFrameRate = targetFrameRate;
-        // Optionally adjust physics timestep when changing frame rate:
-        // Time.fixedDeltaTime = 1f / Mathf.Max(50f, targetFrameRate); // example
+        ApplyFrameRateSettings();
+    }
 
-        SetTargetFrameRate(targetFrameRate);
+    private void ApplyFrameRateSettings()
+    {
+        if (useVSync)
+        {
+            // Enable VSync (typically 1 = every VBlank, 2 = every second VBlank)
+            QualitySettings.vSyncCount = Mathf.Max(1, vSyncCount);
+            // VSync overrides targetFrameRate, but set to -1 to indicate no limit beyond VSync
+            Application.targetFrameRate = -1;
+            Debug.Log($"[FrameRateLimiter] VSync enabled with count: {QualitySettings.vSyncCount}");
+        }
+        else
+        {
+            // Disable VSync
+            QualitySettings.vSyncCount = 0;
+            // Set target frame rate
+            Application.targetFrameRate = targetFrameRate;
+            
+            #if UNITY_EDITOR
+            Debug.LogWarning($"[FrameRateLimiter] Target FPS set to {targetFrameRate}. Note: Application.targetFrameRate may not work reliably in Unity Editor. Use VSync or test in a build for accurate frame rate limiting.");
+            #else
+            Debug.Log($"[FrameRateLimiter] Target FPS set to {targetFrameRate}");
+            #endif
+        }
+        
+        // Force Unity to respect the settings
+        QualitySettings.maxQueuedFrames = 0;
     }
 
     // Optional runtime setters
     public void SetTargetFrameRate(int fps)
     {
         targetFrameRate = fps;
-        if (!useVSync) Application.targetFrameRate = fps;
+        ApplyFrameRateSettings();
     }
 
     public void SetVSync(bool enabled, int count = 1)
     {
         useVSync = enabled;
         vSyncCount = count;
-        QualitySettings.vSyncCount = enabled ? count : 0;
-        if (!enabled) Application.targetFrameRate = targetFrameRate;
+        ApplyFrameRateSettings();
     }
 }
