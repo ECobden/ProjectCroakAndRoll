@@ -17,6 +17,11 @@ public class DB_DiceController : MonoBehaviour
     [SerializeField] private float settleAngularVelocityThreshold = 0.1f;
     [SerializeField] private float settleDoubleCheckDelay = 0.5f; // Time to wait before confirming dice has stopped
     [SerializeField] private float moveLerpDuration = 0.5f;
+    
+    [Header("Flip Animation")]
+    [SerializeField] private float flipJumpHeight = 0.3f;
+    [SerializeField] private float flipDuration = 0.5f;
+    [SerializeField] private float flipRotationSpeed = 720f; // Degrees per second for 180 flip
 
     [Header("Audio")]
     [SerializeField] private AudioSource audioSource;
@@ -37,6 +42,7 @@ public class DB_DiceController : MonoBehaviour
     private Rigidbody rb;
     private bool isRolling = false;
     private bool isLerping = false;
+    private bool isFlipping = false;
     private int lastRollValue = 0;
     private System.Action<int> onRollComplete;
     private float lastCollisionTime = 0f;
@@ -109,10 +115,21 @@ public class DB_DiceController : MonoBehaviour
     public int GetLastRollValue() => lastRollValue;
 
     public bool IsRolling() => isRolling;
+    
+    public bool IsFlipping() => isFlipping;
 
     public void SetOnRollCompleteCallback(System.Action<int> callback)
     {
         onRollComplete = callback;
+    }
+    
+    /// <summary>
+    /// Flip the dice to show its opposite face with a jump and 180-degree rotation animation.
+    /// </summary>
+    public void FlipToOppositeFace(int newFaceValue)
+    {
+        if (isFlipping) return;
+        StartCoroutine(FlipDiceCoroutine(newFaceValue));
     }
     
     #endregion
@@ -143,6 +160,61 @@ public class DB_DiceController : MonoBehaviour
         yield return StartCoroutine(ExecuteRoll(transform.position));
 
         isRolling = false;
+    }
+    
+    private IEnumerator FlipDiceCoroutine(int targetFaceValue)
+    {
+        isFlipping = true;
+        
+        // Make dice kinematic for controlled animation
+        if (rb != null)
+        {
+            rb.isKinematic = true;
+            rb.useGravity = false;
+        }
+        
+        Vector3 startPosition = transform.position;
+        Quaternion startRotation = transform.rotation;
+        
+        // Generate random rotation axis for 180-degree flip
+        Vector3 randomAxis = new Vector3(
+            Random.Range(-1f, 1f),
+            Random.Range(-1f, 1f),
+            Random.Range(-1f, 1f)
+        ).normalized;
+        
+        Quaternion targetRotation = startRotation * Quaternion.AngleAxis(180f, randomAxis);
+        
+        float elapsed = 0f;
+        
+        while (elapsed < flipDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / flipDuration;
+            
+            // Smooth interpolation
+            float smoothT = Mathf.SmoothStep(0f, 1f, t);
+            
+            // Jump animation (parabolic arc)
+            float jumpProgress = Mathf.Sin(t * Mathf.PI);
+            Vector3 jumpOffset = Vector3.up * (jumpProgress * flipJumpHeight);
+            
+            // Apply position and rotation
+            transform.position = startPosition + jumpOffset;
+            transform.rotation = Quaternion.Slerp(startRotation, targetRotation, smoothT);
+            
+            yield return null;
+        }
+        
+        // Ensure final position and rotation
+        transform.position = startPosition;
+        transform.rotation = targetRotation;
+        
+        // Update the face value
+        lastRollValue = targetFaceValue;
+        Debug.Log($"Dice flipped to: {targetFaceValue}");
+        
+        isFlipping = false;
     }
     
     #endregion

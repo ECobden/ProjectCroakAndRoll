@@ -143,6 +143,52 @@ public class DB_DiceManager : MonoBehaviour
     #region Public API
 
     public bool IsDiceRolling() => isDiceRolling;
+    
+    /// <summary>
+    /// Get the current value of dice A
+    /// </summary>
+    public int GetDiceAValue()
+    {
+        return diceControllerA != null ? diceControllerA.GetLastRollValue() : 0;
+    }
+    
+    /// <summary>
+    /// Get the current value of dice B
+    /// </summary>
+    public int GetDiceBValue()
+    {
+        return diceControllerB != null ? diceControllerB.GetLastRollValue() : 0;
+    }
+    
+    /// <summary>
+    /// Flip both dice to show opposite faces with animation
+    /// </summary>
+    public void FlipBothDice(int newDiceAValue, int newDiceBValue)
+    {
+        if (diceControllerA != null)
+            diceControllerA.FlipToOppositeFace(newDiceAValue);
+            
+        if (diceControllerB != null)
+            diceControllerB.FlipToOppositeFace(newDiceBValue);
+    }
+    
+    /// <summary>
+    /// Flip only dice A to show opposite face with animation
+    /// </summary>
+    public void FlipDiceA(int newValue)
+    {
+        if (diceControllerA != null)
+            diceControllerA.FlipToOppositeFace(newValue);
+    }
+    
+    /// <summary>
+    /// Flip only dice B to show opposite face with animation
+    /// </summary>
+    public void FlipDiceB(int newValue)
+    {
+        if (diceControllerB != null)
+            diceControllerB.FlipToOppositeFace(newValue);
+    }
 
     #endregion
 }

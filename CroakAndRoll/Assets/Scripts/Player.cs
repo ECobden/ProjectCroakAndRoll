@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine.UI;
 
@@ -16,11 +17,15 @@ public class Player : MonoBehaviour
     [Header("Turn State")]
     private int turnValue = 0;
     private int lastRollValue = 0;
+    private int rollCount = 0;
     private bool canAct = false;
     private bool hasRolledThisTurn = false;
     private DB_GameManager gameManager;
     private DB_DiceManager diceManager;
     private DB_UIManager uiManager;
+    
+    [Header("Perks")]
+    private List<Perk> activePerks = new List<Perk>();
 
     void Start()
     {
@@ -47,11 +52,35 @@ public class Player : MonoBehaviour
 
     private void OnDiceRolled(int diceAValue, int diceBValue)
     {
-        lastRollValue = diceAValue + diceBValue;
+        // Increment roll count
+        rollCount++;
+        
+        // Allow perks to modify dice values before adding to turn total
+        int modifiedDiceA = diceAValue;
+        int modifiedDiceB = diceBValue;
+        
+        foreach (var perk in activePerks)
+        {
+            (modifiedDiceA, modifiedDiceB) = perk.ModifyDiceValues(this, modifiedDiceA, modifiedDiceB, turnValue);
+        }
+        
+        lastRollValue = modifiedDiceA + modifiedDiceB;
         turnValue += lastRollValue;
         hasRolledThisTurn = true;
 
-        Debug.Log($"Player rolled: {lastRollValue} (Dice: {diceAValue} + {diceBValue}). Turn total: {turnValue}");
+        Debug.Log($"Player rolled: {diceAValue} + {diceBValue} = {diceAValue + diceBValue}");
+        if (modifiedDiceA != diceAValue || modifiedDiceB != diceBValue)
+        {
+            Debug.Log($"Modified by perks to: {modifiedDiceA} + {modifiedDiceB} = {lastRollValue}");
+        }
+        Debug.Log($"Turn total: {turnValue}");
+        
+        // Trigger perk hooks for individual dice (use original values)
+        foreach (var perk in activePerks)
+        {
+            perk.OnDiceRolled(this, diceAValue, true);  // Dice A
+            perk.OnDiceRolled(this, diceBValue, false); // Dice B
+        }
 
         UpdateTurnValueUI();
 
@@ -74,14 +103,19 @@ public class Player : MonoBehaviour
         }
         else if (turnValue == 21)
         {
-            Debug.Log("Player hit 21! Perfect score. Auto-standing...");
+            canAct = false;
+            Debug.Log("Player hit 21! Perfect score - Instant Win!");
             
             // Show 21 message
             if (uiManager != null)
                 uiManager.ShowPlayer21();
             
-            // Delay before standing to let UI animation finish
-            StartCoroutine(DelayedStand());
+            // Disable buttons
+            if (gameManager != null)
+                gameManager.DisableGameplayButtons();
+            
+            // Delay before winning to let UI animation finish
+            StartCoroutine(DelayedWinWith21());
         }
     }
 
@@ -100,13 +134,45 @@ public class Player : MonoBehaviour
         yield return new WaitForSeconds(animationDuration);
         Stand();
     }
+    
+    private IEnumerator DelayedWinWith21()
+    {
+        // Wait for score animation to complete
+        float animationDuration = uiManager != null ? uiManager.GetScoreAnimationDuration(lastRollValue) : 0.8f;
+        yield return new WaitForSeconds(animationDuration);
+        OnWinWith21();
+    }
+    
+    private void OnWinWith21()
+    {
+        // Move dice back to idle positions
+        if (diceManager != null)
+            diceManager.RefreshDiceIdlePositions();
+        
+        // Show stand value
+        if (uiManager != null)
+            uiManager.ShowStandValue($"{turnValue}");
+        
+        // Trigger instant win
+        if (gameManager != null)
+        {
+            gameManager.PlayerWinsWith21();
+        }
+    }
 
     public void OnTurnStart(int selectedBetAmount)
     {
         turnValue = 0;
         lastRollValue = 0;
+        rollCount = 0;
         canAct = true;
         hasRolledThisTurn = false;
+        
+        // Trigger perk hooks
+        foreach (var perk in activePerks)
+        {
+            perk.OnTurnStart(this);
+        }
         
         // Hide stand value UI and reset progress at start of new turn
         if (uiManager != null)
@@ -150,6 +216,11 @@ public class Player : MonoBehaviour
     {
         return turnValue;
     }
+    
+    public int GetRollCount()
+    {
+        return rollCount;
+    }
 
     public bool HasRolledThisTurn()
     {
@@ -182,6 +253,12 @@ public class Player : MonoBehaviour
         canAct = false;
         Debug.Log($"Player stands with {turnValue}");
         
+        // Trigger perk hooks
+        foreach (var perk in activePerks)
+        {
+            perk.OnStand(this);
+        }
+        
         // Show stand value UI
         if (uiManager != null)
             uiManager.ShowStandValue($"{turnValue}");
@@ -204,6 +281,12 @@ public class Player : MonoBehaviour
 
     private void OnBust()
     {
+        // Trigger perk hooks
+        foreach (var perk in activePerks)
+        {
+            perk.OnBust(this);
+        }
+        
         if (gameManager != null)
         {
             gameManager.PlayerBust();
@@ -250,5 +333,101 @@ public class Player : MonoBehaviour
         currentMoney = startingMoney;
         UpdateMoneyUI();
     }
+    
+    #region Perk Management
+    
+    /// <summary>
+    /// Add a perk to the player
+    /// </summary>
+    public void AddPerk(Perk perk)
+    {
+        if (perk == null) return;
+        
+        activePerks.Add(perk);
+        perk.OnPerkAdded(this);
+        Debug.Log($"Player acquired perk: {perk.perkName}");
+    }
+    
+    /// <summary>
+    /// Get all active perks
+    /// </summary>
+    public List<Perk> GetActivePerks()
+    {
+        return new List<Perk>(activePerks);
+    }
+    
+    /// <summary>
+    /// Check if player has a specific perk type
+    /// </summary>
+    public bool HasPerk<T>() where T : Perk
+    {
+        return activePerks.Exists(p => p is T);
+    }
+    
+    /// <summary>
+    /// Remove all perks (for reset)
+    /// </summary>
+    public void ClearPerks()
+    {
+        activePerks.Clear();
+    }
+    
+    /// <summary>
+    /// Trigger instant win from 5 and Under perk
+    /// </summary>
+    public void TriggerFiveAndUnderWin()
+    {
+        canAct = false;
+        
+        // Disable buttons
+        if (gameManager != null)
+            gameManager.DisableGameplayButtons();
+        
+        // Show stand value
+        if (uiManager != null)
+            uiManager.ShowStandValue($"{turnValue}");
+        
+        // Move dice back to idle
+        if (diceManager != null)
+            diceManager.RefreshDiceIdlePositions();
+        
+        // Trigger win
+        if (gameManager != null)
+        {
+            gameManager.PlayerWinsWith21(); // Reusing this method for instant win
+        }
+    }
+    
+    /// <summary>
+    /// Trigger dice flip animation (used by Dice Flip perk)
+    /// </summary>
+    public void TriggerDiceFlipAnimation(int newDiceAValue, int newDiceBValue)
+    {
+        // Trigger the visual dice flip animation through the dice manager
+        if (diceManager != null)
+        {
+            // Determine which dice changed and flip accordingly
+            int currentA = diceManager.GetDiceAValue();
+            int currentB = diceManager.GetDiceBValue();
+            
+            if (currentA != newDiceAValue && currentB != newDiceBValue)
+            {
+                // Both dice flipped
+                diceManager.FlipBothDice(newDiceAValue, newDiceBValue);
+            }
+            else if (currentA != newDiceAValue)
+            {
+                // Only dice A flipped
+                diceManager.FlipDiceA(newDiceAValue);
+            }
+            else if (currentB != newDiceBValue)
+            {
+                // Only dice B flipped
+                diceManager.FlipDiceB(newDiceBValue);
+            }
+        }
+    }
+    
+    #endregion
 
 }

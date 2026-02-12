@@ -18,6 +18,7 @@ public class UI_RoundResultController : MonoBehaviour
     [SerializeField] private string house21Message = "HOUSE HITS 21!";
     [SerializeField] private string houseWinsMessage = "HOUSE WINS!";
     [SerializeField] private string playerWinsMessage = "PLAYER WINS!";
+    [SerializeField] private string houseCheatedMessage = "TABLE SLAM!";
 
     [Header("Animation Settings")]
     [SerializeField] private float fadeInDuration = 0.3f;
@@ -101,6 +102,14 @@ public class UI_RoundResultController : MonoBehaviour
     public void ShowPlayerWins()
     {
         ShowMessage(playerWinsMessage);
+    }
+
+    /// <summary>
+    /// Show the house cheated message.
+    /// </summary>
+    public void ShowHouseCheated()
+    {
+        ShowMessage(houseCheatedMessage);
     }
 
     /// <summary>

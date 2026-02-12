@@ -15,6 +15,7 @@ public class DB_GameManager : MonoBehaviour
         PlayerStanding,    // Player has stood, transitioning to house
         HouseTurn,         // House rolling dice
         RoundOver,         // Round ending, determining winner
+        HeatDecision,      // Player choosing to increase heat or cash out
         GameOver           // Game completely over
     }
     
@@ -46,6 +47,22 @@ public class DB_GameManager : MonoBehaviour
     #region Private Fields
     
     private GameState currentState = GameState.BettingPhase;
+    private int heatLevel = 0;
+    private const int MAX_HEAT = 8;
+    
+    // Lives system
+    private int currentLives = 3;
+    private const int MAX_LIVES = 3;
+    
+    // Reward system (replaces betting)
+    private const int BASE_WIN_REWARD = 100;
+    private const int HEAT_BONUS_MULTIPLIER = 50;
+    
+    // Track if player won current round
+    private bool playerWonCurrentRound = false;
+    
+    // Track if buttons have been initialized
+    private bool buttonsInitialized = false;
     
     #endregion
 
@@ -57,7 +74,12 @@ public class DB_GameManager : MonoBehaviour
         InitializeUI();
 
         roundManager.InitializeRound();
-        ShowBetSelectionPanel();
+        UpdateHeatDisplay();
+        UpdateLivesDisplay();
+        
+        // BETTING DISABLED: Skip bet selection and start first round  
+        // Call EnterState directly for initial setup (can't transition from BettingPhase to BettingPhase)
+        EnterState(GameState.BettingPhase, GameState.BettingPhase);
     }
 
     private void Update()
@@ -140,7 +162,8 @@ public class DB_GameManager : MonoBehaviour
         switch (state)
         {
             case GameState.BettingPhase:
-                ShowBetSelectionPanel();
+                // BETTING DISABLED: Auto-start round with 0 bet
+                StartRoundWithoutBetting();
                 break;
                 
             case GameState.PlayerTurn:
@@ -168,6 +191,10 @@ public class DB_GameManager : MonoBehaviour
                 HandleRoundOver();
                 break;
                 
+            case GameState.HeatDecision:
+                ShowHeatDecisionPanel();
+                break;
+                
             case GameState.GameOver:
                 if (uiManager != null)
                     uiManager.ShowGameOverPanel();
@@ -179,11 +206,24 @@ public class DB_GameManager : MonoBehaviour
     {
         if (uiManager == null) yield break;
         
-        // Switch UI buttons with animation
-        yield return StartCoroutine(uiManager.SwitchToGameplayButtons(
-            () => { if (player != null) player.Stand(); },
-            () => { if (player != null) player.RollDice(); }
-        ));
+        // Use appropriate method based on whether buttons have been initialized
+        if (buttonsInitialized)
+        {
+            // Switch UI buttons with animation
+            yield return StartCoroutine(uiManager.SwitchToGameplayButtons(
+                () => { if (player != null) player.Stand(); },
+                () => { if (player != null) player.RollDice(); }
+            ));
+        }
+        else
+        {
+            // First time - show buttons directly
+            yield return StartCoroutine(uiManager.ShowGameplayButtonsDirectly(
+                () => { if (player != null) player.Stand(); },
+                () => { if (player != null) player.RollDice(); }
+            ));
+            buttonsInitialized = true;
+        }
         
         // UI is ready, now start the turn
         StartPlayerTurnInternal();
@@ -263,7 +303,10 @@ public class DB_GameManager : MonoBehaviour
 
     public void PlayerBust()
     {
-        Debug.Log("GAME OVER - Player busted!");
+        Debug.Log("PLAYER BUSTED!");
+        
+        // Player lost - no reward, no heat decision
+        playerWonCurrentRound = false;
         
         if (uiManager != null)
             uiManager.ClearScoreText();
@@ -275,15 +318,28 @@ public class DB_GameManager : MonoBehaviour
     {
         Debug.Log("PLAYER WINS - House busted!");
         
-        if (player != null && house != null)
-        {
-            int betAmount = player.GetBetAmount();
-            int totalPayout = house.PayWinnings(betAmount);
-            player.AddMoney(totalPayout);
-        }
+        // Mark that player won this round
+        playerWonCurrentRound = true;
         
         if (uiManager != null)
             uiManager.ClearScoreText();
+        
+        TransitionToState(GameState.RoundOver);
+    }
+    
+    public void PlayerWinsWith21()
+    {
+        Debug.Log("PLAYER WINS - Hit 21!");
+        
+        // Mark that player won this round
+        playerWonCurrentRound = true;
+        
+        // Show player wins message
+        if (uiManager != null)
+        {
+            uiManager.ClearScoreText();
+            uiManager.ShowPlayerWins();
+        }
         
         TransitionToState(GameState.RoundOver);
     }
@@ -291,6 +347,9 @@ public class DB_GameManager : MonoBehaviour
     public void HouseWins()
     {
         Debug.Log("HOUSE WINS - House beat player's score!");
+        
+        // Player lost - no reward, no heat decision
+        playerWonCurrentRound = false;
         
         if (uiManager != null)
             uiManager.ClearScoreText();
@@ -306,28 +365,73 @@ public class DB_GameManager : MonoBehaviour
 
     private void HandleRoundOver()
     {
-        // Check if game should end completely
-        if (player != null && player.GetCurrentMoney() < smallBetAmount)
+        // Check if player won - if so, give them heat decision choice
+        if (playerWonCurrentRound)
         {
-            Debug.Log("GAME OVER - Player cannot afford even the smallest bet!");
-            TransitionToState(GameState.GameOver);
+            Debug.Log("Player won! Increasing heat...");
+            // Refill lives on win
+            currentLives = MAX_LIVES;
+            UpdateLivesDisplay();
+            
+            // Increment heat on win
+            IncrementHeat();
+            
+            // Check if player reached max heat
+            if (heatLevel >= MAX_HEAT)
+            {
+                Debug.Log($"Player reached maximum heat level {MAX_HEAT}! Must cash out.");
+                // At max heat, force cash out
+                OnCashOut();
+                return;
+            }
+            
+            StartCoroutine(ShowHeatDecisionAfterDelay());
             return;
         }
-
-        if (house != null && house.GetCurrentMoney() <= 0)
+        
+        // Player lost - decrease lives
+        Debug.Log("Player lost. Decreasing lives...");
+        currentLives--;
+        UpdateLivesDisplay();
+        
+        // Check if player is out of lives
+        if (currentLives <= 0)
         {
-            Debug.Log("GAME OVER - Player wins! House is out of money!");
-            TransitionToState(GameState.GameOver);
-            return;
+            Debug.Log("Player is out of lives! Resetting heat and lives...");
+            // Reset heat to 0 when player loses all lives
+            heatLevel = 0;
+            UpdateHeatDisplay();
+            // Reset lives back to max
+            currentLives = MAX_LIVES;
+            UpdateLivesDisplay();
         }
-
-        // Game continues - start a new round after delay
+        
+        // Start new round after delay
+        Debug.Log($"Lives remaining: {currentLives}. Starting new round...");
         StartCoroutine(StartNewRoundAfterDelay());
     }
     
     #endregion
 
-    #region Betting
+    #region Betting (Currently Disabled)
+
+    private void StartRoundWithoutBetting()
+    {
+        Debug.Log("Starting round without betting (free play)");
+        
+        // Update goal text
+        if (uiManager != null)
+        {
+            uiManager.UpdateGoalText("Get Ready!");
+        }
+        
+        // Start player's turn with 0 bet
+        if (player != null)
+            player.OnTurnStart(0);
+        
+        // Transition to PlayerTurn (will show gameplay buttons automatically)
+        TransitionToState(GameState.PlayerTurn);
+    }
 
     public void OnSmallBetSelected()
     {
@@ -408,6 +512,12 @@ public class DB_GameManager : MonoBehaviour
         OnStartNewRound();
     }
     
+    private IEnumerator ShowHeatDecisionAfterDelay()
+    {
+        yield return new WaitForSeconds(newRoundDelay);
+        TransitionToState(GameState.HeatDecision);
+    }
+    
     #endregion
 
     #region Game Control
@@ -422,26 +532,36 @@ public class DB_GameManager : MonoBehaviour
         if (diceManager != null)
             diceManager.RefreshDiceIdlePositions();
         
-        // Reinitialize and show bet selection
+        // Reinitialize and start round without betting
         roundManager.InitializeRound();
-        ShowBetSelectionPanel();
+        // Call EnterState directly since we just reset to BettingPhase
+        EnterState(GameState.BettingPhase, GameState.GameOver);
     }
 
     private void ResetGameState()
     {
         currentState = GameState.BettingPhase;
+        heatLevel = 0;
+        currentLives = MAX_LIVES;
+        buttonsInitialized = false;
         
         if (uiManager != null)
         {
             uiManager.HideGameOverPanel();
             uiManager.DeactivateButtons();
         }
+        
+        UpdateHeatDisplay();
+        UpdateLivesDisplay();
     }
 
     private void ResetPlayers()
     {
         if (player != null)
+        {
             player.ResetMoney();
+            player.ClearPerks();
+        }
 
         if (house != null)
         {
@@ -494,6 +614,137 @@ public class DB_GameManager : MonoBehaviour
         }
     }
     
+    #endregion
+
+    #region Heat Decision
+
+    private void ShowHeatDecisionPanel()
+    {
+        int potentialReward = CalculateWinReward();
+        int nextHeatReward = CalculateNextHeatReward();
+        
+        if (uiManager != null)
+        {
+            uiManager.ShowHeatDecisionPanel(
+                heatLevel, 
+                potentialReward, 
+                nextHeatReward,
+                OnIncreaseHeat, 
+                OnCashOut
+            );
+        }
+    }
+
+    public void OnIncreaseHeat()
+    {
+        Debug.Log($"Player chose to continue playing at heat {heatLevel}!");
+        
+        if (uiManager != null)
+            uiManager.HideHeatDecisionPanel();
+        
+        // Reset win flag and start new round
+        playerWonCurrentRound = false;
+        OnStartNewRound();
+    }
+
+    public void OnCashOut()
+    {
+        int reward = CalculateWinReward();
+        Debug.Log($"Player cashed out! Reward: {reward}");
+        
+        if (uiManager != null)
+            uiManager.HideHeatDecisionPanel();
+        
+        // Give player their reward
+        if (player != null)
+        {
+            player.AddMoney(reward);
+            Debug.Log($"Player earned {reward} (Base: {BASE_WIN_REWARD}, Heat Bonus: {heatLevel * HEAT_BONUS_MULTIPLIER})");
+        }
+        
+        // Reset win flag
+        playerWonCurrentRound = false;
+        
+        // Open shop
+        OpenShop();
+    }
+
+    private void OpenShop()
+    {
+        Debug.Log("Opening shop...");
+        
+        if (uiManager != null && player != null)
+        {
+            uiManager.ShowShop(player, OnCloseShop);
+        }
+    }
+
+    public void OnCloseShop()
+    {
+        Debug.Log("Shop closed, starting new round...");
+        
+        if (uiManager != null)
+            uiManager.HideShop();
+        
+        // Start new round
+        OnStartNewRound();
+    }
+
+    #endregion
+
+    #region Reward System
+
+    private int CalculateWinReward()
+    {
+        int baseReward = BASE_WIN_REWARD;
+        int heatBonus = heatLevel * HEAT_BONUS_MULTIPLIER;
+        return baseReward + heatBonus;
+    }
+    
+    private int CalculateNextHeatReward()
+    {
+        int baseReward = BASE_WIN_REWARD;
+        int nextHeatBonus = (heatLevel + 1) * HEAT_BONUS_MULTIPLIER;
+        return baseReward + nextHeatBonus;
+    }
+
+    #endregion
+
+    #region Heat Management
+
+    private void IncrementHeat()
+    {
+        heatLevel++;
+        Debug.Log($"Heat level increased to {heatLevel}");
+        UpdateHeatDisplay();
+        
+        // Check for victory at heat 8
+        if (heatLevel >= MAX_HEAT)
+        {
+            Debug.Log($"Player reached Heat {MAX_HEAT}! Victory condition met!");
+        }
+    }
+
+    private void UpdateHeatDisplay()
+    {
+        if (uiManager != null)
+        {
+            uiManager.UpdateHeatDisplay(heatLevel, MAX_HEAT);
+        }
+    }
+    
+    private void UpdateLivesDisplay()
+    {
+        if (uiManager != null)
+        {
+            uiManager.UpdateLivesDisplay(currentLives, MAX_LIVES);
+        }
+    }
+    
+    public int GetHeatLevel() => heatLevel;
+    
+    public int GetCurrentLives() => currentLives;
+
     #endregion
 
     #region Public API

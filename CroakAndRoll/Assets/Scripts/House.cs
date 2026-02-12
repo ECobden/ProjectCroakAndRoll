@@ -18,10 +18,17 @@ public class House : MonoBehaviour
     [Header("Turn State")]
     private int turnValue = 0;
     private int lastRollValue = 0;
+    private int lastDiceA = 0;
+    private int lastDiceB = 0;
     private int targetValue = 0;
     private DB_GameManager gameManager;
     private DB_DiceManager diceManager;
     private DB_UIManager uiManager;
+    
+    [Header("Cheat System")]
+    [SerializeField] private bool enableCheats = true;
+    [SerializeField] private AudioClip tableSlamSound;
+    private bool usedCheatThisRound = false;
 
     void Start()
     {
@@ -36,6 +43,9 @@ public class House : MonoBehaviour
     {
         turnValue = 0;
         lastRollValue = 0;
+        lastDiceA = 0;
+        lastDiceB = 0;
+        usedCheatThisRound = false;
         
         // Reset roll progress for house turn
         if (uiManager != null)
@@ -86,6 +96,8 @@ public class House : MonoBehaviour
 
     private void OnDiceRolled(int diceAValue, int diceBValue)
     {
+        lastDiceA = diceAValue;
+        lastDiceB = diceBValue;
         lastRollValue = diceAValue + diceBValue;
         turnValue += lastRollValue;
 
@@ -96,6 +108,14 @@ public class House : MonoBehaviour
         // Check win/bust conditions
         if (turnValue > 21)
         {
+            // Try to cheat before busting
+            if (TryTableSlamCheat())
+            {
+                Debug.Log("House used table slam cheat to avoid bust!");
+                // Recalculate with flipped dice
+                return; // Exit early - cheating changes the flow
+            }
+            
             Debug.Log("House BUST! House exceeded 21.");
             
             // Show bust message
@@ -250,6 +270,147 @@ public class House : MonoBehaviour
     {
         turnValue = 0;
         lastRollValue = 0;
+        lastDiceA = 0;
+        lastDiceB = 0;
+        usedCheatThisRound = false;
         UpdateTurnValueUI();
     }
+    
+    #region Cheat System
+    
+    /// <summary>
+    /// Get opposite face value of a die (1↔6, 2↔5, 3↔4)
+    /// </summary>
+    private int GetOppositeFace(int faceValue)
+    {
+        return 7 - faceValue;
+    }
+    
+    /// <summary>
+    /// Table Slam Cheat: Flip dice to opposite values to avoid busting
+    /// Active at Heat Level 1+
+    /// </summary>
+    private bool TryTableSlamCheat()
+    {
+        // Check if cheats are enabled
+        if (!enableCheats)
+            return false;
+        
+        // Check if already used cheat this round
+        if (usedCheatThisRound)
+            return false;
+        
+        // Check if heat level is high enough (1+)
+        if (gameManager == null || gameManager.GetHeatLevel() < 1)
+            return false;
+        
+        // We're busting - try to flip dice to avoid it
+        int currentTurnValueBeforeRoll = turnValue - lastRollValue;
+        
+        // Try flipping both dice
+        int flippedA = GetOppositeFace(lastDiceA);
+        int flippedB = GetOppositeFace(lastDiceB);
+        int newTotal = currentTurnValueBeforeRoll + flippedA + flippedB;
+        
+        if (newTotal <= 21)
+        {
+            // Both dice flip works!
+            Debug.Log($"Table Slam! Flipping both dice: ({lastDiceA},{lastDiceB}) -> ({flippedA},{flippedB})");
+            StartCoroutine(ApplyTableSlam(flippedA, flippedB));
+            return true;
+        }
+        
+        // Try flipping only dice A
+        newTotal = currentTurnValueBeforeRoll + flippedA + lastDiceB;
+        if (newTotal <= 21)
+        {
+            Debug.Log($"Table Slam! Flipping dice A: {lastDiceA} -> {flippedA}");
+            StartCoroutine(ApplyTableSlam(flippedA, lastDiceB));
+            return true;
+        }
+        
+        // Try flipping only dice B
+        newTotal = currentTurnValueBeforeRoll + lastDiceA + flippedB;
+        if (newTotal <= 21)
+        {
+            Debug.Log($"Table Slam! Flipping dice B: {lastDiceB} -> {flippedB}");
+            StartCoroutine(ApplyTableSlam(lastDiceA, flippedB));
+            return true;
+        }
+        
+        // No flip combination saves us from busting
+        Debug.Log("Table Slam failed - no combination prevents bust");
+        return false;
+    }
+    
+    /// <summary>
+    /// Apply the table slam cheat with new dice values and flip animation
+    /// </summary>
+    private IEnumerator ApplyTableSlam(int newDiceA, int newDiceB)
+    {
+        usedCheatThisRound = true;
+        
+        // Play table slam sound if available
+        if (tableSlamSound != null)
+        {
+            AudioSource.PlayClipAtPoint(tableSlamSound, Camera.main.transform.position);
+        }
+        
+        // Show cheating visual feedback
+        if (uiManager != null)
+        {
+            uiManager.ShowHouseCheated();
+        }
+        
+        // Trigger dice flip animation through dice manager
+        if (diceManager != null)
+        {
+            diceManager.FlipBothDice(newDiceA, newDiceB);
+        }
+        
+        // Wait for flip animation to complete
+        yield return new WaitForSeconds(0.5f);
+        
+        // Update dice values
+        lastDiceA = newDiceA;
+        lastDiceB = newDiceB;
+        int newRollValue = newDiceA + newDiceB;
+        
+        // Recalculate turn value
+        turnValue = turnValue - lastRollValue + newRollValue;
+        lastRollValue = newRollValue;
+        
+        Debug.Log($"After table slam - Roll: {lastRollValue} (Dice: {lastDiceA} + {lastDiceB}). New turn total: {turnValue}");
+        
+        // Update UI with corrected value
+        UpdateTurnValueUI();
+        
+        // Continue with normal flow - check new conditions
+        if (turnValue == 21)
+        {
+            Debug.Log($"House hits 21 after cheat!");
+            
+            if (uiManager != null)
+                uiManager.ShowHouse21();
+            
+            StartCoroutine(DelayedWin());
+        }
+        else if (turnValue >= targetValue)
+        {
+            Debug.Log($"House wins with {turnValue} after cheat (matched or beat player's {targetValue})");
+            
+            if (uiManager != null)
+                uiManager.ShowHouseWins();
+            
+            StartCoroutine(DelayedWin());
+        }
+        else
+        {
+            // Still need to keep rolling
+            Debug.Log($"House has {turnValue} after cheat, needs to match or beat {targetValue}. Rolling again...");
+            StartCoroutine(DelayedRoll());
+        }
+    }
+    
+    #endregion
 }
