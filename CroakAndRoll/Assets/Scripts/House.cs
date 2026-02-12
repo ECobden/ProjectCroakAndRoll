@@ -1,6 +1,27 @@
 using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
 using TMPro;
+
+[System.Serializable]
+public class HouseCheat
+{
+    public enum CheatType
+    {
+        TableSlam,      // Flip dice to opposite values
+        LoadedDice,     // Force specific values
+        SecondChance,   // Reroll if busting
+        PerfectCount    // Always know exact value needed
+    }
+    
+    public CheatType cheatType;
+    public int requiredHeatLevel = 1;
+    public bool enabled = true;
+    
+    [Header("Cheat-Specific Settings")]
+    [Tooltip("For LoadedDice: preferred value to load (if possible)")]
+    public int preferredValue = 6;
+}
 
 public class House : MonoBehaviour
 {
@@ -27,8 +48,10 @@ public class House : MonoBehaviour
     
     [Header("Cheat System")]
     [SerializeField] private bool enableCheats = true;
+    [SerializeField] private List<HouseCheat> availableCheats = new List<HouseCheat>();
     [SerializeField] private AudioClip tableSlamSound;
     private bool usedCheatThisRound = false;
+    private HashSet<HouseCheat.CheatType> usedCheatTypes = new HashSet<HouseCheat.CheatType>();
 
     void Start()
     {
@@ -46,6 +69,7 @@ public class House : MonoBehaviour
         lastDiceA = 0;
         lastDiceB = 0;
         usedCheatThisRound = false;
+        usedCheatTypes.Clear();
         
         // Reset roll progress for house turn
         if (uiManager != null)
@@ -109,10 +133,10 @@ public class House : MonoBehaviour
         if (turnValue > 21)
         {
             // Try to cheat before busting
-            if (TryTableSlamCheat())
+            if (TryUseCheats())
             {
-                Debug.Log("House used table slam cheat to avoid bust!");
-                // Recalculate with flipped dice
+                Debug.Log("House used cheat to avoid bust!");
+                // Recalculate with altered dice
                 return; // Exit early - cheating changes the flow
             }
             
@@ -273,6 +297,7 @@ public class House : MonoBehaviour
         lastDiceA = 0;
         lastDiceB = 0;
         usedCheatThisRound = false;
+        usedCheatTypes.Clear();
         UpdateTurnValueUI();
     }
     
@@ -287,23 +312,66 @@ public class House : MonoBehaviour
     }
     
     /// <summary>
+    /// Try to use any available cheat based on current heat level
+    /// </summary>
+    private bool TryUseCheats()
+    {
+        if (!enableCheats || gameManager == null)
+            return false;
+        
+        int currentHeat = gameManager.GetHeatLevel();
+        
+        // Try each available cheat in order
+        foreach (var cheat in availableCheats)
+        {
+            if (!cheat.enabled)
+                continue;
+            
+            // Check if heat level is high enough
+            if (currentHeat < cheat.requiredHeatLevel)
+                continue;
+            
+            // Check if this cheat type was already used this round
+            if (usedCheatTypes.Contains(cheat.cheatType))
+                continue;
+            
+            // Try to use the cheat
+            bool success = false;
+            switch (cheat.cheatType)
+            {
+                case HouseCheat.CheatType.TableSlam:
+                    success = TryTableSlamCheat();
+                    break;
+                    
+                case HouseCheat.CheatType.LoadedDice:
+                    success = TryLoadedDiceCheat(cheat.preferredValue);
+                    break;
+                    
+                case HouseCheat.CheatType.SecondChance:
+                    success = TrySecondChanceCheat();
+                    break;
+                    
+                case HouseCheat.CheatType.PerfectCount:
+                    success = TryPerfectCountCheat();
+                    break;
+            }
+            
+            if (success)
+            {
+                usedCheatTypes.Add(cheat.cheatType);
+                Debug.Log($"House used {cheat.cheatType} cheat (Heat Level {currentHeat} required {cheat.requiredHeatLevel})");
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    /// <summary>
     /// Table Slam Cheat: Flip dice to opposite values to avoid busting
-    /// Active at Heat Level 1+
     /// </summary>
     private bool TryTableSlamCheat()
     {
-        // Check if cheats are enabled
-        if (!enableCheats)
-            return false;
-        
-        // Check if already used cheat this round
-        if (usedCheatThisRound)
-            return false;
-        
-        // Check if heat level is high enough (1+)
-        if (gameManager == null || gameManager.GetHeatLevel() < 1)
-            return false;
-        
         // We're busting - try to flip dice to avoid it
         int currentTurnValueBeforeRoll = turnValue - lastRollValue;
         
@@ -407,6 +475,192 @@ public class House : MonoBehaviour
         else
         {
             // Still need to keep rolling
+            Debug.Log($"House has {turnValue} after cheat, needs to match or beat {targetValue}. Rolling again...");
+            StartCoroutine(DelayedRoll());
+        }
+    }
+    
+    /// <summary>
+    /// Loaded Dice Cheat: Force dice to specific values to avoid busting
+    /// </summary>
+    private bool TryLoadedDiceCheat(int preferredValue)
+    {
+        int currentTurnValueBeforeRoll = turnValue - lastRollValue;
+        int targetNeeded = 21 - currentTurnValueBeforeRoll;
+        
+        // Try to get as close to target as possible without going over
+        int bestDiceA = 1;
+        int bestDiceB = 1;
+        int bestTotal = 2;
+        
+        for (int a = 1; a <= 6; a++)
+        {
+            for (int b = 1; b <= 6; b++)
+            {
+                int total = a + b;
+                if (currentTurnValueBeforeRoll + total <= 21 && total > bestTotal)
+                {
+                    bestDiceA = a;
+                    bestDiceB = b;
+                    bestTotal = total;
+                }
+            }
+        }
+        
+        // If we found a better combination than what we rolled
+        if (bestTotal > lastRollValue || currentTurnValueBeforeRoll + lastRollValue > 21)
+        {
+            Debug.Log($"Loaded Dice! Changing ({lastDiceA},{lastDiceB}) to ({bestDiceA},{bestDiceB})");
+            StartCoroutine(ApplyLoadedDice(bestDiceA, bestDiceB));
+            return true;
+        }
+        
+        return false;
+    }
+    
+    /// <summary>
+    /// Second Chance Cheat: Reroll the dice to avoid busting
+    /// </summary>
+    private bool TrySecondChanceCheat()
+    {
+        // Simply reroll - there's a chance we get better values
+        Debug.Log($"Second Chance! Rerolling bust ({lastDiceA},{lastDiceB})");
+        StartCoroutine(ApplySecondChance());
+        return true;
+    }
+    
+    /// <summary>
+    /// Perfect Count Cheat: Know exactly what value is needed and get it
+    /// </summary>
+    private bool TryPerfectCountCheat()
+    {
+        int currentTurnValueBeforeRoll = turnValue - lastRollValue;
+        int exactNeeded = targetValue - currentTurnValueBeforeRoll;
+        
+        // Can we make this exact value with dice?
+        if (exactNeeded >= 2 && exactNeeded <= 12)
+        {
+            // Find dice combination that makes exact value
+            for (int a = 1; a <= 6; a++)
+            {
+                int b = exactNeeded - a;
+                if (b >= 1 && b <= 6)
+                {
+                    Debug.Log($"Perfect Count! Getting exact value needed: ({a},{b}) = {exactNeeded}");
+                    StartCoroutine(ApplyPerfectCount(a, b));
+                    return true;
+                }
+            }
+        }
+        
+        return false;
+    }
+    
+    /// <summary>
+    /// Apply loaded dice cheat
+    /// </summary>
+    private IEnumerator ApplyLoadedDice(int newDiceA, int newDiceB)
+    {
+        usedCheatThisRound = true;
+        
+        if (tableSlamSound != null)
+            AudioSource.PlayClipAtPoint(tableSlamSound, Camera.main.transform.position);
+        
+        if (uiManager != null)
+            uiManager.ShowHouseCheated();
+        
+        if (diceManager != null)
+            diceManager.FlipBothDice(newDiceA, newDiceB);
+        
+        yield return new WaitForSeconds(0.5f);
+        
+        // Update values and continue
+        lastDiceA = newDiceA;
+        lastDiceB = newDiceB;
+        int newRollValue = newDiceA + newDiceB;
+        turnValue = turnValue - lastRollValue + newRollValue;
+        lastRollValue = newRollValue;
+        
+        UpdateTurnValueUI();
+        CheckTurnConditions();
+    }
+    
+    /// <summary>
+    /// Apply second chance cheat (reroll)
+    /// </summary>
+    private IEnumerator ApplySecondChance()
+    {
+        usedCheatThisRound = true;
+        
+        if (uiManager != null)
+            uiManager.ShowHouseCheated();
+        
+        yield return new WaitForSeconds(0.3f);
+        
+        // Undo the bust roll
+        turnValue -= lastRollValue;
+        
+        // Reroll dice
+        RollDice();
+    }
+    
+    /// <summary>
+    /// Apply perfect count cheat
+    /// </summary>
+    private IEnumerator ApplyPerfectCount(int newDiceA, int newDiceB)
+    {
+        usedCheatThisRound = true;
+        
+        if (tableSlamSound != null)
+            AudioSource.PlayClipAtPoint(tableSlamSound, Camera.main.transform.position);
+        
+        if (uiManager != null)
+            uiManager.ShowHouseCheated();
+        
+        if (diceManager != null)
+            diceManager.FlipBothDice(newDiceA, newDiceB);
+        
+        yield return new WaitForSeconds(0.5f);
+        
+        // Update values
+        lastDiceA = newDiceA;
+        lastDiceB = newDiceB;
+        int newRollValue = newDiceA + newDiceB;
+        turnValue = turnValue - lastRollValue + newRollValue;
+        lastRollValue = newRollValue;
+        
+        UpdateTurnValueUI();
+        CheckTurnConditions();
+    }
+    
+    /// <summary>
+    /// Check turn conditions after cheat application
+    /// </summary>
+    private void CheckTurnConditions()
+    {
+        if (turnValue == 21)
+        {
+            Debug.Log($"House hits 21 after cheat!");
+            if (uiManager != null)
+                uiManager.ShowHouse21();
+            StartCoroutine(DelayedWin());
+        }
+        else if (turnValue >= targetValue)
+        {
+            Debug.Log($"House wins with {turnValue} after cheat (matched or beat player's {targetValue})");
+            if (uiManager != null)
+                uiManager.ShowHouseWins();
+            StartCoroutine(DelayedWin());
+        }
+        else if (turnValue > 21)
+        {
+            Debug.Log($"House still busting after cheat!");
+            if (uiManager != null)
+                uiManager.ShowHouseBust();
+            StartCoroutine(DelayedBust());
+        }
+        else
+        {
             Debug.Log($"House has {turnValue} after cheat, needs to match or beat {targetValue}. Rolling again...");
             StartCoroutine(DelayedRoll());
         }

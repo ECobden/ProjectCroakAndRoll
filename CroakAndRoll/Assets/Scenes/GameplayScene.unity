@@ -448,7 +448,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 144.1875, y: -52.7}
+  m_AnchoredPosition: {x: 144.1875, y: -52.69995}
   m_SizeDelta: {x: 277.495, y: 42.0529}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &44916782
@@ -5352,7 +5352,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 208.62, y: -3.315979}
+  m_AnchoredPosition: {x: 208.62, y: -3.31604}
   m_SizeDelta: {x: 148.62, y: 43.432}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &882317244
@@ -12205,6 +12205,23 @@ MonoBehaviour:
   startingMoney: 1000
   winMultiplier: 1.5
   enableCheats: 1
+  availableCheats:
+  - cheatType: 2
+    requiredHeatLevel: 3
+    enabled: 1
+    preferredValue: 0
+  - cheatType: 1
+    requiredHeatLevel: 5
+    enabled: 1
+    preferredValue: 0
+  - cheatType: 0
+    requiredHeatLevel: 7
+    enabled: 1
+    preferredValue: 0
+  - cheatType: 3
+    requiredHeatLevel: 0
+    enabled: 0
+    preferredValue: 0
   tableSlamSound: {fileID: 0}
 --- !u!1001 &1214840838
 PrefabInstance:
@@ -13954,7 +13971,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 289.8, y: 31.4}
+  m_AnchoredPosition: {x: 289.80005, y: 31.400024}
   m_SizeDelta: {x: 291.6095, y: 42.0529}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1402758330
@@ -19050,6 +19067,9 @@ MonoBehaviour:
   largeBetAmount: 100
   restartKey: 114
   newRoundDelay: 1.5
+  heatLevelBasePayouts: 6400000096000000c80000002c010000900100005802000020030000b0040000
+  doubleOrNothingBaseMultiplier: 1.5
+  doubleOrNothingMultiplierIncrement: 0.5
 --- !u!4 &1991118091
 Transform:
   m_ObjectHideFlags: 0

@@ -42,6 +42,11 @@ public class DB_GameManager : MonoBehaviour
     [SerializeField] private KeyCode restartKey = KeyCode.R;
     [SerializeField] private float newRoundDelay = 1.5f;
     
+    [Header("Reward System")]
+    [SerializeField] private int[] heatLevelBasePayouts = new int[] { 100, 150, 200, 300, 400, 600, 800, 1200 };
+    [SerializeField] private float doubleOrNothingBaseMultiplier = 1.5f;
+    [SerializeField] private float doubleOrNothingMultiplierIncrement = 0.5f;
+    
     #endregion
 
     #region Private Fields
@@ -54,9 +59,9 @@ public class DB_GameManager : MonoBehaviour
     private int currentLives = 3;
     private const int MAX_LIVES = 3;
     
-    // Reward system (replaces betting)
-    private const int BASE_WIN_REWARD = 100;
-    private const int HEAT_BONUS_MULTIPLIER = 50;
+    // Reward accumulation system
+    private int accumulatedReward = 0;
+    private int consecutiveDoubleOrNothings = 0;
     
     // Track if player won current round
     private bool playerWonCurrentRound = false;
@@ -544,6 +549,8 @@ public class DB_GameManager : MonoBehaviour
         heatLevel = 0;
         currentLives = MAX_LIVES;
         buttonsInitialized = false;
+        accumulatedReward = 0;
+        consecutiveDoubleOrNothings = 0;
         
         if (uiManager != null)
         {
@@ -637,7 +644,15 @@ public class DB_GameManager : MonoBehaviour
 
     public void OnIncreaseHeat()
     {
-        Debug.Log($"Player chose to continue playing at heat {heatLevel}!");
+        Debug.Log($"Player chose Double or Nothing!");
+        
+        // Add current payout to accumulation
+        int currentPayout = GetCurrentHeatPayout();
+        accumulatedReward += currentPayout;
+        consecutiveDoubleOrNothings++;
+        
+        float nextMultiplier = GetCurrentMultiplier();
+        Debug.Log($"Banked {currentPayout}. Accumulated: {accumulatedReward}, Streak: {consecutiveDoubleOrNothings}, Next multiplier: {nextMultiplier:F1}x");
         
         if (uiManager != null)
             uiManager.HideHeatDecisionPanel();
@@ -659,8 +674,14 @@ public class DB_GameManager : MonoBehaviour
         if (player != null)
         {
             player.AddMoney(reward);
-            Debug.Log($"Player earned {reward} (Base: {BASE_WIN_REWARD}, Heat Bonus: {heatLevel * HEAT_BONUS_MULTIPLIER})");
+            int currentPayout = GetCurrentHeatPayout();
+            float multiplier = GetCurrentMultiplier();
+            Debug.Log($"Player earned {reward} (Accumulated: {accumulatedReward}, Current: {currentPayout}, Multiplier: {multiplier:F1}x)");
         }
+        
+        // Reset accumulation and streak
+        accumulatedReward = 0;
+        consecutiveDoubleOrNothings = 0;
         
         // Reset win flag
         playerWonCurrentRound = false;
@@ -694,18 +715,52 @@ public class DB_GameManager : MonoBehaviour
 
     #region Reward System
 
+    private int GetCurrentHeatPayout()
+    {
+        // Get base payout for current heat level (1-indexed, so subtract 1 for array)
+        if (heatLevel > 0 && heatLevel <= heatLevelBasePayouts.Length)
+        {
+            return heatLevelBasePayouts[heatLevel - 1];
+        }
+        return 100; // Fallback for out of range
+    }
+    
+    private int GetNextHeatPayout()
+    {
+        // Get base payout for next heat level
+        int nextHeatLevel = heatLevel + 1;
+        if (nextHeatLevel > 0 && nextHeatLevel <= heatLevelBasePayouts.Length)
+        {
+            return heatLevelBasePayouts[nextHeatLevel - 1];
+        }
+        return 100; // Fallback
+    }
+    
+    private float GetCurrentMultiplier()
+    {
+        if (consecutiveDoubleOrNothings == 0)
+            return 1.0f;
+        
+        return doubleOrNothingBaseMultiplier + (doubleOrNothingMultiplierIncrement * (consecutiveDoubleOrNothings - 1));
+    }
+
     private int CalculateWinReward()
     {
-        int baseReward = BASE_WIN_REWARD;
-        int heatBonus = heatLevel * HEAT_BONUS_MULTIPLIER;
-        return baseReward + heatBonus;
+        // This is what player gets if they cash out now
+        int currentPayout = GetCurrentHeatPayout();
+        int totalBeforeMultiplier = accumulatedReward + currentPayout;
+        float multiplier = GetCurrentMultiplier();
+        return Mathf.RoundToInt(totalBeforeMultiplier * multiplier);
     }
     
     private int CalculateNextHeatReward()
     {
-        int baseReward = BASE_WIN_REWARD;
-        int nextHeatBonus = (heatLevel + 1) * HEAT_BONUS_MULTIPLIER;
-        return baseReward + nextHeatBonus;
+        // This shows what they could get if they double or nothing, win next round, then cash out
+        int currentPayout = GetCurrentHeatPayout();
+        int nextPayout = GetNextHeatPayout();
+        int futureTotal = accumulatedReward + currentPayout + nextPayout;
+        float futureMultiplier = doubleOrNothingBaseMultiplier + (doubleOrNothingMultiplierIncrement * consecutiveDoubleOrNothings);
+        return Mathf.RoundToInt(futureTotal * futureMultiplier);
     }
 
     #endregion
