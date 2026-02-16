@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
 
 public class DB_DiceManager : MonoBehaviour
 {
@@ -17,6 +18,13 @@ public class DB_DiceManager : MonoBehaviour
     [SerializeField] private Transform playerLaunchPositionB;
     [SerializeField] private Transform houseLaunchPositionA;
     [SerializeField] private Transform houseLaunchPositionB;
+    
+    [Header("Scoring Positions")]
+    [SerializeField] private ScoredDicePositioner playerScoringPositioner; // Player scored dice manager
+    [SerializeField] private ScoredDicePositioner houseScoringPositioner;  // House scored dice manager
+    
+    [Header("Timing Settings")]
+    [SerializeField] private float delayBeforeMovingToScoring = 0.5f; // Delay after dice settle before moving to scoring position
 
     #endregion
 
@@ -32,25 +40,36 @@ public class DB_DiceManager : MonoBehaviour
 
     public void Initialize()
     {
-        SpawnSharedDice();
-        InitializeSharedDice();
-        RefreshDiceIdlePositions();
+        // NEW: Don't spawn dice at initialization - they'll be spawned on first roll
+        // Just ensure positioners are ready
+        if (playerScoringPositioner != null)
+            playerScoringPositioner.ClearAllDice();
+        if (houseScoringPositioner != null)
+            houseScoringPositioner.ClearAllDice();
+        
+        Debug.Log("DiceManager initialized - dice will spawn on first roll");
     }
 
     private void SpawnSharedDice()
     {
-        if (dicePrefab == null) return;
+        if (dicePrefab == null)
+        {
+            Debug.LogError("Dice prefab is not assigned!");
+            return;
+        }
 
         if (diceControllerA == null)
         {
             GameObject diceInstanceA = Instantiate(dicePrefab, GetIdlePosition(diceIdlePositionA), Quaternion.identity, diceParent);
             diceControllerA = diceInstanceA.GetComponent<DB_DiceController>();
+            Debug.Log("Spawned new dice A");
         }
 
         if (diceControllerB == null)
         {
             GameObject diceInstanceB = Instantiate(dicePrefab, GetIdlePosition(diceIdlePositionB), Quaternion.identity, diceParent);
             diceControllerB = diceInstanceB.GetComponent<DB_DiceController>();
+            Debug.Log("Spawned new dice B");
         }
     }
 
@@ -77,11 +96,10 @@ public class DB_DiceManager : MonoBehaviour
 
     public void RefreshDiceIdlePositions()
     {
-        if (diceControllerA != null)
-            diceControllerA.ReturnToIdlePosition();
-
-        if (diceControllerB != null)
-            diceControllerB.ReturnToIdlePosition();
+        // Legacy method - no longer moves dice back to idle
+        // Dice are now instantiated fresh for each roll
+        // This method kept for compatibility but does nothing
+        Debug.Log("RefreshDiceIdlePositions called (no-op in new system)");
     }
 
     private Vector3 GetIdlePosition(Transform target)
@@ -102,6 +120,10 @@ public class DB_DiceManager : MonoBehaviour
         }
 
         isDiceRolling = true;
+        
+        // Spawn fresh dice for this roll
+        SpawnSharedDice();
+        InitializeSharedDice();
 
         // Get appropriate launch positions based on turn
         Vector3 launchPosA = isPlayerTurn ? GetIdlePosition(playerLaunchPositionA) : GetIdlePosition(houseLaunchPositionA);
@@ -125,9 +147,23 @@ public class DB_DiceManager : MonoBehaviour
         int diceAValue = diceControllerA != null ? diceControllerA.GetLastRollValue() : 0;
         int diceBValue = diceControllerB != null ? diceControllerB.GetLastRollValue() : 0;
 
+        // Wait a short delay before moving to scoring position
+        yield return new WaitForSeconds(delayBeforeMovingToScoring);
+        
+        // Store references to current dice
+        DB_DiceController currentDiceA = diceControllerA;
+        DB_DiceController currentDiceB = diceControllerB;
+        
+        // Clear the main references so next roll can spawn new dice
+        diceControllerA = null;
+        diceControllerB = null;
+        
+        // Move dice to scoring position and wait for movement to complete
+        yield return StartCoroutine(MoveDiceToScoringPositionCoroutine(currentDiceA, currentDiceB, isPlayerTurn));
+        
         isDiceRolling = false;
 
-        // Return results via callback
+        // Return results via callback - only after dice are in position
         onComplete?.Invoke(diceAValue, diceBValue);
     }
 
@@ -140,9 +176,64 @@ public class DB_DiceManager : MonoBehaviour
 
     #endregion
 
+    #region Scoring Position Management
+    
+    /// <summary>
+    /// Move rolled dice to scoring positions and wait for movement to complete
+    /// </summary>
+    private IEnumerator MoveDiceToScoringPositionCoroutine(DB_DiceController diceA, DB_DiceController diceB, bool isPlayerTurn)
+    {
+        ScoredDicePositioner positioner = isPlayerTurn ? playerScoringPositioner : houseScoringPositioner;
+        
+        if (positioner == null)
+        {
+            Debug.LogWarning($"Scoring positioner not set for {(isPlayerTurn ? "player" : "house")}! Dice will not be positioned.");
+            yield break;
+        }
+        
+        // Let the positioner handle the positioning and wait for movement to complete
+        yield return StartCoroutine(positioner.AddDiceRowCoroutine(diceA, diceB));
+        
+        Debug.Log($"Added {(isPlayerTurn ? "player" : "house")} dice to scoring area via positioner");
+    }
+    
+    /// <summary>
+    /// Clear all scored dice (called at round start)
+    /// </summary>
+    public void ClearScoredDice()
+    {
+        // Clear player scored dice
+        if (playerScoringPositioner != null)
+            playerScoringPositioner.ClearAllDice();
+        
+        // Clear house scored dice
+        if (houseScoringPositioner != null)
+            houseScoringPositioner.ClearAllDice();
+        
+        // Clear current rolling dice
+        if (diceControllerA != null)
+        {
+            Destroy(diceControllerA.gameObject);
+            diceControllerA = null;
+        }
+        if (diceControllerB != null)
+        {
+            Destroy(diceControllerB.gameObject);
+            diceControllerB = null;
+        }
+        
+        Debug.Log("Cleared all scored dice");
+    }
+    
+    #endregion
+
     #region Public API
 
     public bool IsDiceRolling() => isDiceRolling;
+    
+    public ScoredDicePositioner GetPlayerScoringPositioner() => playerScoringPositioner;
+    
+    public ScoredDicePositioner GetHouseScoringPositioner() => houseScoringPositioner;
     
     /// <summary>
     /// Get the current value of dice A

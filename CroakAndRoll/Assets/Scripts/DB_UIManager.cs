@@ -5,6 +5,7 @@ using System.Collections;
 using System;
 using DG.Tweening;
 
+// UI Manager for dice battle game
 public class DB_UIManager : MonoBehaviour
 {
     #region Serialized Fields
@@ -37,6 +38,10 @@ public class DB_UIManager : MonoBehaviour
     
     [Header("Shop Panel")]
     [SerializeField] private UI_PerkShopController perkShopController;
+    
+    [Header("Round Total Display")]
+    [SerializeField] private TextMeshProUGUI playerRoundTotalText;
+    [SerializeField] private TextMeshProUGUI houseRoundTotalText;
 
     #endregion
 
@@ -214,6 +219,12 @@ public class DB_UIManager : MonoBehaviour
     {
         if (buttonRight != null)
             buttonRight.EnableButton();
+    }
+
+    public void SetRollButtonText(string text)
+    {
+        if (buttonRight != null)
+            buttonRight.SetButtonText(text);
     }
 
     public void DeactivateButtons()
@@ -464,5 +475,29 @@ public class DB_UIManager : MonoBehaviour
             perkShopController.Hide();
     }
 
+    #endregion
+    
+    #region Round Total Display
+    
+    public void UpdatePlayerRoundTotal(int total)
+    {
+        if (playerRoundTotalText != null)
+            playerRoundTotalText.text = total.ToString();
+    }
+    
+    public void UpdateHouseRoundTotal(int total)
+    {
+        if (houseRoundTotalText != null)
+            houseRoundTotalText.text = total.ToString();
+    }
+    
+    public void ClearRoundTotals()
+    {
+        if (playerRoundTotalText != null)
+            playerRoundTotalText.text = "0";
+        if (houseRoundTotalText != null)
+            houseRoundTotalText.text = "0";
+    }
+    
     #endregion
 }

@@ -47,7 +47,7 @@ public class House : MonoBehaviour
     private DB_UIManager uiManager;
     
     [Header("Cheat System")]
-    [SerializeField] private bool enableCheats = true;
+    [SerializeField] private bool enableCheats = false;  // DISABLED FOR TESTING
     [SerializeField] private List<HouseCheat> availableCheats = new List<HouseCheat>();
     [SerializeField] private AudioClip tableSlamSound;
     private bool usedCheatThisRound = false;
@@ -123,6 +123,16 @@ public class House : MonoBehaviour
         lastDiceA = diceAValue;
         lastDiceB = diceBValue;
         lastRollValue = diceAValue + diceBValue;
+        
+        // Check if we're in alternating turn mode
+        if (gameManager != null && gameManager.GetCurrentState() == DB_GameManager.GameState.AlternatingTurns)
+        {
+            // Handle roll through game manager for alternating mode
+            gameManager.OnAlternatingRoll(diceAValue, diceBValue, false);
+            return;
+        }
+        
+        // Legacy single-turn mode below
         turnValue += lastRollValue;
 
         Debug.Log($"House rolled: {lastRollValue} (Dice: {diceAValue} + {diceBValue}). Turn total: {turnValue}");

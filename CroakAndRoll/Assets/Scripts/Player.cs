@@ -47,11 +47,28 @@ public class Player : MonoBehaviour
     {
         if (!canAct || gameManager == null || gameManager.IsDiceRolling()) return;
         
+        // Check if we're in rule decision mode
+        if (gameManager.IsWaitingForPlayerRuleDecision())
+        {
+            gameManager.OnPlayerEndTurnDuringRuleDecision();
+            return;
+        }
+        
         gameManager.RollSharedDice(OnDiceRolled, true); // true = player turn
     }
 
     private void OnDiceRolled(int diceAValue, int diceBValue)
     {
+        // Check if we're in alternating turn mode
+        if (gameManager != null && gameManager.GetCurrentState() == DB_GameManager.GameState.AlternatingTurns)
+        {
+            // Handle roll through game manager for alternating mode
+            gameManager.OnAlternatingRoll(diceAValue, diceBValue, true);
+            hasRolledThisTurn = true;
+            return;
+        }
+        
+        // Legacy single-turn mode below
         // Increment roll count
         rollCount++;
         
@@ -238,6 +255,13 @@ public class Player : MonoBehaviour
         if (gameManager != null && gameManager.IsDiceRolling())
         {
             Debug.LogWarning("Stand called but dice are still rolling. Ignoring.");
+            return;
+        }
+
+        // Check if we're in alternating turn mode
+        if (gameManager != null && gameManager.GetCurrentState() == DB_GameManager.GameState.AlternatingTurns)
+        {
+            gameManager.OnPlayerStandInAlternating();
             return;
         }
 

@@ -29,16 +29,16 @@ public class DB_DiceController : MonoBehaviour
     [SerializeField] private AudioClip[] collisionSounds;
     [SerializeField] private float minCollisionVelocity = 0.5f;
     [SerializeField] private float collisionCooldown = 0.1f;
-
-    [Header("Face Detection")]
-    [SerializeField] private GameObject facePositionsPrefab;
+    
+    [Header("Highlight Settings")]
+    [SerializeField] private GameObject destroyHighlightObject;
+    [SerializeField] private GameObject swapHighlightObject;
     
     #endregion
 
     #region Private Fields
     
     private Vector3 idlePosition;
-    private GameObject facePositionsInstance;
     private Rigidbody rb;
     private bool isRolling = false;
     private bool isLerping = false;
@@ -46,6 +46,11 @@ public class DB_DiceController : MonoBehaviour
     private int lastRollValue = 0;
     private System.Action<int> onRollComplete;
     private float lastCollisionTime = 0f;
+    
+    // Highlighting system
+    private bool isHighlighted = false;
+    private System.Action<DB_DiceController> onDiceClicked;
+    private bool isClickable = false;
     
     #endregion
 
@@ -55,6 +60,12 @@ public class DB_DiceController : MonoBehaviour
     {
         rb = GetComponent<Rigidbody>();
         
+        // Ensure highlight objects start disabled
+        if (destroyHighlightObject != null)
+            destroyHighlightObject.SetActive(false);
+        if (swapHighlightObject != null)
+            swapHighlightObject.SetActive(false);
+        
         if (audioSource == null)
         {
             audioSource = GetComponent<AudioSource>();
@@ -63,10 +74,14 @@ public class DB_DiceController : MonoBehaviour
                 audioSource = gameObject.AddComponent<AudioSource>();
             }
         }
-        
-        if (facePositionsPrefab != null && facePositionsInstance == null)
+    }
+    
+    private void OnMouseDown()
+    {
+        if (isClickable && onDiceClicked != null)
         {
-            facePositionsInstance = Instantiate(facePositionsPrefab, transform);
+            Debug.Log($"Dice clicked with value {lastRollValue}");
+            onDiceClicked.Invoke(this);
         }
     }
     
@@ -123,6 +138,55 @@ public class DB_DiceController : MonoBehaviour
         onRollComplete = callback;
     }
     
+    public void SetClickable(bool clickable, System.Action<DB_DiceController> clickCallback = null)
+    {
+        isClickable = clickable;
+        onDiceClicked = clickCallback;
+    }
+    
+    public void Highlight(Color color)
+    {
+        if (isHighlighted)
+        {
+            Debug.LogWarning($"Die {lastRollValue} is already highlighted");
+            return;
+        }
+        
+        isHighlighted = true;
+        
+        // Determine which highlight to show based on color
+        // Red = destroy, Blue = swap
+        if (color == Color.red && destroyHighlightObject != null)
+        {
+            destroyHighlightObject.SetActive(true);
+            Debug.Log($"Highlighting die {lastRollValue} with destroy highlight (red)");
+        }
+        else if (color == Color.blue && swapHighlightObject != null)
+        {
+            swapHighlightObject.SetActive(true);
+            Debug.Log($"Highlighting die {lastRollValue} with swap highlight (blue)");
+        }
+        else
+        {
+            Debug.LogWarning($"No highlight object set for color {color} on die {lastRollValue}");
+        }
+    }
+    
+    public void RemoveHighlight()
+    {
+        if (!isHighlighted) return;
+        
+        isHighlighted = false;
+        
+        // Turn off all highlight objects
+        if (destroyHighlightObject != null)
+            destroyHighlightObject.SetActive(false);
+        if (swapHighlightObject != null)
+            swapHighlightObject.SetActive(false);
+        
+        Debug.Log($"Removed highlight from die {lastRollValue}");
+    }
+    
     /// <summary>
     /// Flip the dice to show its opposite face with a jump and 180-degree rotation animation.
     /// </summary>
@@ -166,6 +230,10 @@ public class DB_DiceController : MonoBehaviour
     {
         isFlipping = true;
         
+        // Update face value immediately for instant score feedback
+        lastRollValue = targetFaceValue;
+        Debug.Log($"Dice flipping to: {targetFaceValue}");
+        
         // Make dice kinematic for controlled animation
         if (rb != null)
         {
@@ -176,14 +244,8 @@ public class DB_DiceController : MonoBehaviour
         Vector3 startPosition = transform.position;
         Quaternion startRotation = transform.rotation;
         
-        // Generate random rotation axis for 180-degree flip
-        Vector3 randomAxis = new Vector3(
-            Random.Range(-1f, 1f),
-            Random.Range(-1f, 1f),
-            Random.Range(-1f, 1f)
-        ).normalized;
-        
-        Quaternion targetRotation = startRotation * Quaternion.AngleAxis(180f, randomAxis);
+        // Calculate the rotation needed to show the target face value
+        Quaternion targetRotation = GetRotationForFaceValue(targetFaceValue);
         
         float elapsed = 0f;
         
@@ -210,11 +272,62 @@ public class DB_DiceController : MonoBehaviour
         transform.position = startPosition;
         transform.rotation = targetRotation;
         
-        // Update the face value
-        lastRollValue = targetFaceValue;
-        Debug.Log($"Dice flipped to: {targetFaceValue}");
+        Debug.Log($"Dice flip animation completed: {targetFaceValue}");
         
         isFlipping = false;
+    }
+    
+    /// <summary>
+    /// Calculates the rotation needed to show the specified face value pointing up.
+    /// Uses the current rotation as a base and adjusts it to align the correct local axis with world up.
+    /// </summary>
+    private Quaternion GetRotationForFaceValue(int faceValue)
+    {
+        // Determine which local axis should point up for this face value
+        // Face 2: Local Y+ (up)
+        // Face 5: Local Y- (down)
+        // Face 1: Local X+ (right)
+        // Face 6: Local X- (left)
+        // Face 3: Local Z+ (forward)
+        // Face 4: Local Z- (back)
+        
+        Vector3 localAxisToPointUp;
+        
+        switch (faceValue)
+        {
+            case 2:
+                localAxisToPointUp = Vector3.up;      // Local Y+
+                break;
+            case 5:
+                localAxisToPointUp = Vector3.down;    // Local Y-
+                break;
+            case 1:
+                localAxisToPointUp = Vector3.right;   // Local X+
+                break;
+            case 6:
+                localAxisToPointUp = Vector3.left;    // Local X-
+                break;
+            case 3:
+                localAxisToPointUp = Vector3.forward; // Local Z+
+                break;
+            case 4:
+                localAxisToPointUp = Vector3.back;    // Local Z-
+                break;
+            default:
+                Debug.LogWarning($"[DB_DiceController] Invalid face value {faceValue}, defaulting to face 2");
+                localAxisToPointUp = Vector3.up;
+                break;
+        }
+        
+        // Create a rotation that aligns the local axis with world up
+        // We want: rotation * localAxisToPointUp = Vector3.up
+        Quaternion targetRotation = Quaternion.FromToRotation(localAxisToPointUp, Vector3.up);
+        
+        // Add random rotation around the Y axis to keep it interesting while maintaining the face up
+        float randomYRotation = Random.Range(0f, 360f);
+        targetRotation = Quaternion.Euler(0, randomYRotation, 0) * targetRotation;
+        
+        return targetRotation;
     }
     
     #endregion
@@ -275,9 +388,9 @@ public class DB_DiceController : MonoBehaviour
         lastRollValue = faceValue;
         Debug.Log($"Dice rolled: {faceValue}");
 
-        // Move back to idle position
-        yield return StartCoroutine(LerpToPositionInternal(idlePosition));
-
+        // DON'T move back to idle position - dice will be moved to scoring position by DiceManager
+        // The dice should stay in its settled position to preserve the correct face orientation
+        
         // Notify completion
         OnDiceRollComplete(faceValue);
         onRollComplete?.Invoke(faceValue);
@@ -451,42 +564,48 @@ public class DB_DiceController : MonoBehaviour
 
     private int GetDiceFaceValue()
     {
-        if (facePositionsInstance == null)
-        {
-            Debug.LogError("[DB_DiceController] Face Positions instance is not set.");
-            return 0;
-        }
-
-        Transform upwardFace = null;
-        float highestDot = -1f;
-
-        foreach (Transform child in facePositionsInstance.transform)
-        {
-            Vector3 directionToFace = (child.position - transform.position).normalized;
-            float dotProduct = Vector3.Dot(directionToFace, Vector3.up);
-
-            if (dotProduct > highestDot)
-            {
-                highestDot = dotProduct;
-                upwardFace = child;
-            }
-        }
-
-        if (upwardFace != null)
-        {
-            if (int.TryParse(upwardFace.name, out int faceValue))
-            {
-                return faceValue;
-            }
-
-            Debug.LogError("[DB_DiceController] Face name is not a number.");
-        }
-        else
-        {
-            Debug.LogError("[DB_DiceController] No face positions found.");
-        }
-
-        return 0;
+        // Standard dice orientation: Face 2 points up (local Y+) when dice is at identity rotation
+        // Face layout:
+        // - Local Y+ (up) = face 2
+        // - Local Y- (down) = face 5
+        // - Local X+ (right) = face 1
+        // - Local X- (left) = face 6
+        // - Local Z+ (forward) = face 3
+        // - Local Z- (back) = face 4
+        
+        // Get the six local axes in world space
+        Vector3 localUp = transform.up;        // Local Y+
+        Vector3 localDown = -transform.up;      // Local Y-
+        Vector3 localRight = transform.right;   // Local X+
+        Vector3 localLeft = -transform.right;   // Local X-
+        Vector3 localForward = transform.forward; // Local Z+
+        Vector3 localBack = -transform.forward;   // Local Z-
+        
+        // World up direction
+        Vector3 worldUp = Vector3.up;
+        
+        // Calculate dot products to find which local axis is most aligned with world up
+        float dotUp = Vector3.Dot(localUp, worldUp);
+        float dotDown = Vector3.Dot(localDown, worldUp);
+        float dotRight = Vector3.Dot(localRight, worldUp);
+        float dotLeft = Vector3.Dot(localLeft, worldUp);
+        float dotForward = Vector3.Dot(localForward, worldUp);
+        float dotBack = Vector3.Dot(localBack, worldUp);
+        
+        // Find the maximum dot product
+        float maxDot = Mathf.Max(dotUp, dotDown, dotRight, dotLeft, dotForward, dotBack);
+        
+        // Return the corresponding face value
+        if (maxDot == dotUp) return 2;
+        if (maxDot == dotDown) return 5;
+        if (maxDot == dotRight) return 1;
+        if (maxDot == dotLeft) return 6;
+        if (maxDot == dotForward) return 3;
+        if (maxDot == dotBack) return 4;
+        
+        // Fallback (should never reach here)
+        Debug.LogWarning("[DB_DiceController] Could not determine face value from rotation.");
+        return 1;
     }
 
     private void OnDiceRollComplete(int faceValue)
