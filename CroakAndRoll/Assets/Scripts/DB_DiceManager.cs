@@ -23,6 +23,9 @@ public class DB_DiceManager : MonoBehaviour
     [SerializeField] private ScoredDicePositioner playerScoringPositioner; // Player scored dice manager
     [SerializeField] private ScoredDicePositioner houseScoringPositioner;  // House scored dice manager
     
+    [Header("UI Reference")]
+    [SerializeField] private DB_UIManager uiManager; // Reference to UI manager for score animations
+    
     [Header("Timing Settings")]
     [SerializeField] private float delayBeforeMovingToScoring = 0.5f; // Delay after dice settle before moving to scoring position
 
@@ -146,6 +149,18 @@ public class DB_DiceManager : MonoBehaviour
         // Get dice values
         int diceAValue = diceControllerA != null ? diceControllerA.GetLastRollValue() : 0;
         int diceBValue = diceControllerB != null ? diceControllerB.GetLastRollValue() : 0;
+
+        // Show floating score UI immediately after dice stop rolling
+        if (uiManager != null)
+        {
+            // Get current total before adding new dice
+            ScoredDicePositioner currentPositioner = isPlayerTurn ? playerScoringPositioner : houseScoringPositioner;
+            int currentTotal = currentPositioner != null ? currentPositioner.GetTotalScore() : 0;
+            int projectedTotal = currentTotal + diceAValue + diceBValue;
+            
+            // Trigger floating score animation
+            uiManager.UpdateScoreText(projectedTotal, isPlayerTurn);
+        }
 
         // Wait a short delay before moving to scoring position
         yield return new WaitForSeconds(delayBeforeMovingToScoring);

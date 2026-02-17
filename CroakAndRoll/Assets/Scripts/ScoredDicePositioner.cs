@@ -25,7 +25,7 @@ public class ScoredDicePositioner : MonoBehaviour
     [SerializeField] private bool showGizmos = true;
     [SerializeField] private Color gizmoColor = Color.cyan;
     [SerializeField] private float gizmoSize = 0.05f;
-    [SerializeField] private int maxRowsToShow = 10;
+    [SerializeField] private int maxRowsToShow = 5;
     
     #endregion
     

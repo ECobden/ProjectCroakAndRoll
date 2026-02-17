@@ -12,14 +12,13 @@ public class DB_GameManager : MonoBehaviour
     
     public enum GameState
     {
-        BettingPhase,      // Player selecting bet
         PlayerTurn,        // Player rolling dice
         PlayerStanding,    // Player has stood, transitioning to house
         HouseTurn,         // House rolling dice
         RoundOver,         // Round ending, determining winner
         HeatDecision,      // Player choosing to increase heat or cash out
         GameOver,          // Game completely over
-        AlternatingTurns   // NEW: Both alternating rolls
+        AlternatingTurns   // Both alternating rolls
     }
     
     [System.Serializable]
@@ -55,8 +54,6 @@ public class DB_GameManager : MonoBehaviour
     [SerializeField] private DB_UIManager uiManager;
 
     [Header("Game Settings")]
-    [SerializeField] private int smallBetAmount = 50;
-    [SerializeField] private int largeBetAmount = 200;
     [SerializeField] private KeyCode restartKey = KeyCode.R;
     [SerializeField] private float newRoundDelay = 1.5f;
     
@@ -69,7 +66,7 @@ public class DB_GameManager : MonoBehaviour
 
     #region Private Fields
     
-    private GameState currentState = GameState.BettingPhase;
+    private GameState currentState = GameState.RoundOver; // Start in neutral state before first round
     private int heatLevel = 0;
     private const int MAX_HEAT = 8;
     
@@ -119,9 +116,8 @@ public class DB_GameManager : MonoBehaviour
         UpdateHeatDisplay();
         UpdateLivesDisplay();
         
-        // BETTING DISABLED: Skip bet selection and start first round  
-        // Call EnterState directly for initial setup (can't transition from BettingPhase to BettingPhase)
-        EnterState(GameState.BettingPhase, GameState.BettingPhase);
+        // Start first round
+        StartNewRoundInternal();
     }
 
     private void Update()
@@ -220,10 +216,6 @@ public class DB_GameManager : MonoBehaviour
     {
         switch (state)
         {
-            case GameState.BettingPhase:
-                // Clear bet UI
-                break;
-                
             case GameState.PlayerTurn:
                 if (uiManager != null)
                     uiManager.DisableGameplayButtons();
@@ -246,11 +238,6 @@ public class DB_GameManager : MonoBehaviour
     {
         switch (state)
         {
-            case GameState.BettingPhase:
-                // BETTING DISABLED: Auto-start round with 0 bet
-                StartRoundWithoutBetting();
-                break;
-                
             case GameState.AlternatingTurns:
                 // NEW: Alternating turn mode
                 StartAlternatingTurns();
@@ -481,11 +468,11 @@ public class DB_GameManager : MonoBehaviour
     
     #endregion
 
-    #region Betting (Currently Disabled)
+    #region Round Management
 
-    private void StartRoundWithoutBetting()
+    private void StartNewRoundInternal()
     {
-        Debug.Log("Starting round without betting (free play)");
+        Debug.Log("Starting new round");
         
         // Clear all scored dice from previous round
         if (diceManager != null)
@@ -526,63 +513,8 @@ public class DB_GameManager : MonoBehaviour
         TransitionToState(GameState.AlternatingTurns);
     }
 
-    public void OnSmallBetSelected()
-    {
-        if (currentState != GameState.BettingPhase)
-        {
-            Debug.LogWarning($"Bet selected but not in betting phase. Current state: {currentState}");
-            return;
-        }
-
-        if (player == null) return;
-
-        if (player.GetCurrentMoney() < smallBetAmount)
-        {
-            Debug.Log($"Cannot afford small bet of {smallBetAmount}!");
-            PlayerOutOfMoney();
-            return;
-        }
-
-        Debug.Log($"Player selected small bet: {smallBetAmount}");
-        
-        // Start player's turn with bet amount
-        if (player != null)
-            player.OnTurnStart(smallBetAmount);
-        
-        // Transition to PlayerTurn (which will handle UI switch)
-        TransitionToState(GameState.PlayerTurn);
-    }
-
-    public void OnLargeBetSelected()
-    {
-        if (currentState != GameState.BettingPhase)
-        {
-            Debug.LogWarning($"Bet selected but not in betting phase. Current state: {currentState}");
-            return;
-        }
-
-        if (player == null) return;
-
-        if (player.GetCurrentMoney() < largeBetAmount)
-        {
-            Debug.Log($"Cannot afford large bet of {largeBetAmount}!");
-            return;
-        }
-
-        Debug.Log($"Player selected large bet: {largeBetAmount}");
-        
-        // Start player's turn with bet amount
-        if (player != null)
-            player.OnTurnStart(largeBetAmount);
-        
-        // Transition to PlayerTurn (which will handle UI switch)
-        TransitionToState(GameState.PlayerTurn);
-    }
-
     public void OnStartNewRound()
     {
-        Debug.Log("Starting new round...");
-
         if (uiManager != null)
             uiManager.HideStandValue();
             
@@ -595,8 +527,8 @@ public class DB_GameManager : MonoBehaviour
         if (uiManager != null)
             uiManager.ClearScoreText();
 
-        // Transition to betting phase
-        TransitionToState(GameState.BettingPhase);
+        // Start new round
+        StartNewRoundInternal();
     }
 
     private IEnumerator StartNewRoundAfterDelay()
@@ -1262,15 +1194,14 @@ public class DB_GameManager : MonoBehaviour
             diceManager.ClearScoredDice();
         }
         
-        // Reinitialize and start round without betting
+        // Reinitialize and start new round
         roundManager.InitializeRound();
-        // Call EnterState directly since we just reset to BettingPhase
-        EnterState(GameState.BettingPhase, GameState.GameOver);
+        StartNewRoundInternal();
     }
 
     private void ResetGameState()
     {
-        currentState = GameState.BettingPhase;
+        currentState = GameState.RoundOver; // Reset to neutral state
         heatLevel = 0;
         currentLives = MAX_LIVES;
         buttonsInitialized = false;
@@ -1310,19 +1241,6 @@ public class DB_GameManager : MonoBehaviour
         {
             house.ResetMoney();
             house.ResetTurnValue();
-        }
-    }
-    
-    #endregion
-
-    #region UI Helper
-
-    private void ShowBetSelectionPanel()
-    {
-        if (uiManager != null)
-        {
-            uiManager.ShowBetSelection(smallBetAmount, largeBetAmount, OnSmallBetSelected, OnLargeBetSelected);
-            uiManager.UpdateGoalText("Select your bet");
         }
     }
     
@@ -1545,8 +1463,6 @@ public class DB_GameManager : MonoBehaviour
     public bool IsPlayerTurn() => currentState == GameState.PlayerTurn;
     
     public bool IsHouseTurn() => currentState == GameState.HouseTurn;
-    
-    public bool IsBettingPhase() => currentState == GameState.BettingPhase;
 
     public bool IsDiceRolling() => diceManager != null && diceManager.IsDiceRolling();
     
@@ -1554,8 +1470,6 @@ public class DB_GameManager : MonoBehaviour
     
     public void DisableGameplayButtons()
     {
-        if (currentState == GameState.BettingPhase) return;
-        
         if (uiManager != null)
             uiManager.DisableGameplayButtons();
     }
