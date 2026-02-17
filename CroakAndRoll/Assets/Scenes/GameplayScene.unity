@@ -3767,7 +3767,7 @@ Transform:
   m_GameObject: {fileID: 391174693}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.231, y: 1.151, z: 0.153}
+  m_LocalPosition: {x: -0.23, y: 1.151, z: -0.235}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -17866,7 +17866,7 @@ Transform:
   m_GameObject: {fileID: 1612579141}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -0.281, y: 1.129, z: -0.16699988}
+  m_LocalPosition: {x: 0.24100003, y: 1.129, z: -0.21899988}
   m_LocalScale: {x: 2, y: 2, z: 2}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -21703,7 +21703,7 @@ Transform:
   m_GameObject: {fileID: 1862457703}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.2569999, y: 1.151, z: 0.15299997}
+  m_LocalPosition: {x: -0.20400012, y: 1.151, z: -0.23500004}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -22260,7 +22260,7 @@ Transform:
   m_GameObject: {fileID: 1907496416}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -0.32, y: 1.129, z: -0.167}
+  m_LocalPosition: {x: 0.202, y: 1.129, z: -0.219}
   m_LocalScale: {x: 2, y: 2, z: 2}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -22747,8 +22747,6 @@ MonoBehaviour:
   roundManager: {fileID: 700529468}
   diceManager: {fileID: 1216481608}
   uiManager: {fileID: 85049699}
-  smallBetAmount: 25
-  largeBetAmount: 100
   restartKey: 114
   newRoundDelay: 1.5
   heatLevelBasePayouts: 6400000096000000c80000002c010000900100005802000020030000b0040000
