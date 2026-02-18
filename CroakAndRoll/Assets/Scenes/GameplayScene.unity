@@ -1133,7 +1133,6 @@ MonoBehaviour:
   diceSpacing: 0.06
   heightOffset: 0
   moveDuration: 0.5
-  rotationDuration: 0.3
   moveCurve:
     serializedVersion: 2
     m_Curve:
@@ -14205,6 +14204,8 @@ MonoBehaviour:
   autoRollDelay: 1
   startingMoney: 1000
   winMultiplier: 1.5
+  cautiousness: 0.7
+  safeThreshold: 17
   enableCheats: 1
   availableCheats:
   - cheatType: 2
@@ -22723,6 +22724,7 @@ GameObject:
   - component: {fileID: 1991118091}
   - component: {fileID: 1991118090}
   - component: {fileID: 1991118092}
+  - component: {fileID: 1991118093}
   m_Layer: 0
   m_Name: GameManager
   m_TagString: Untagged
@@ -22745,13 +22747,11 @@ MonoBehaviour:
   player: {fileID: 1331433053}
   house: {fileID: 1213451633}
   roundManager: {fileID: 700529468}
+  alternatingRoundManager: {fileID: 1991118093}
   diceManager: {fileID: 1216481608}
   uiManager: {fileID: 85049699}
   restartKey: 114
   newRoundDelay: 1.5
-  heatLevelBasePayouts: 6400000096000000c80000002c010000900100005802000020030000b0040000
-  doubleOrNothingBaseMultiplier: 1.5
-  doubleOrNothingMultiplierIncrement: 0.5
 --- !u!4 &1991118091
 Transform:
   m_ObjectHideFlags: 0
@@ -22786,9 +22786,25 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f8c3ff19f9a5d8946a7264e2e85a3223, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FrameRateLimiter
-  useVSync: 0
-  vSyncCount: 0
+  useVSync: 1
+  vSyncCount: 60
   targetFrameRate: 60
+--- !u!114 &1991118093
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1991118089}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: facf975cc480af14b85f1e56079ff40d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DB_AlternatingRoundManager
+  player: {fileID: 1331433053}
+  house: {fileID: 1213451633}
+  diceManager: {fileID: 1216481608}
+  uiManager: {fileID: 85049699}
 --- !u!1 &1997833546
 GameObject:
   m_ObjectHideFlags: 0
@@ -22837,7 +22853,6 @@ MonoBehaviour:
   diceSpacing: 0.06
   heightOffset: 0
   moveDuration: 0.5
-  rotationDuration: 0.3
   moveCurve:
     serializedVersion: 2
     m_Curve:

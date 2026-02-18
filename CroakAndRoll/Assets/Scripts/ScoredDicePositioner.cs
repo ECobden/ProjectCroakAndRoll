@@ -18,7 +18,6 @@ public class ScoredDicePositioner : MonoBehaviour
     
     [Header("Animation Settings")]
     [SerializeField] private float moveDuration = 0.5f;
-    [SerializeField] private float rotationDuration = 0.3f;
     [SerializeField] private AnimationCurve moveCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
     
     [Header("Gizmo Settings")]

@@ -41,18 +41,6 @@ public class DB_DiceManager : MonoBehaviour
 
     #region Initialization
 
-    public void Initialize()
-    {
-        // NEW: Don't spawn dice at initialization - they'll be spawned on first roll
-        // Just ensure positioners are ready
-        if (playerScoringPositioner != null)
-            playerScoringPositioner.ClearAllDice();
-        if (houseScoringPositioner != null)
-            houseScoringPositioner.ClearAllDice();
-        
-        Debug.Log("DiceManager initialized - dice will spawn on first roll");
-    }
-
     private void SpawnSharedDice()
     {
         if (dicePrefab == null)

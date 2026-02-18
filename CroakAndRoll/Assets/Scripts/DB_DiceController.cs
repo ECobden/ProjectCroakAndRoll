@@ -21,7 +21,6 @@ public class DB_DiceController : MonoBehaviour
     [Header("Flip Animation")]
     [SerializeField] private float flipJumpHeight = 0.3f;
     [SerializeField] private float flipDuration = 0.5f;
-    [SerializeField] private float flipRotationSpeed = 720f; // Degrees per second for 180 flip
 
     [Header("Audio")]
     [SerializeField] private AudioSource audioSource;

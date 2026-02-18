@@ -11,7 +11,6 @@ public class Player : MonoBehaviour
 
     [Header("Money System")]
     [SerializeField] private int startingMoney = 1000;
-    private int betAmount = 100;
     private int currentMoney;
 
     [Header("Turn State")]
@@ -177,7 +176,7 @@ public class Player : MonoBehaviour
         }
     }
 
-    public void OnTurnStart(int selectedBetAmount)
+    public void OnRoundStart(int selectedBetAmount)
     {
         turnValue = 0;
         lastRollValue = 0;
@@ -191,7 +190,7 @@ public class Player : MonoBehaviour
             perk.OnTurnStart(this);
         }
         
-        // Hide stand value UI and reset progress at start of new turn
+        // Hide stand value UI and reset progress at start of new round
         if (uiManager != null)
         {
             uiManager.HideStandValue();
@@ -199,34 +198,7 @@ public class Player : MonoBehaviour
             // Note: Goal text will be updated by GameManager's state transition
         }
         
-        // Update the bet amount
-        betAmount = selectedBetAmount;
-        
-        // Check if player can afford the bet
-        if (currentMoney < betAmount)
-        {
-            Debug.Log($"Player cannot afford bet of {betAmount}! Game Over!");
-            if (gameManager != null)
-            {
-                gameManager.PlayerOutOfMoney();
-            }
-            canAct = false;
-            return;
-        }
-        
-        // Place bet - deduct from player and add to house immediately
-        currentMoney -= betAmount;
-        UpdateMoneyUI();
-        
-        // Transfer bet to house
-        House house = FindFirstObjectByType<House>();
-        if (house != null)
-        {
-            house.ReceiveBet(betAmount);
-        }
-        
-        Debug.Log($"Player placed bet of {betAmount}. Remaining money: {currentMoney}");
-        Debug.Log("Player turn started - Roll (Space) or Stand (S). Target: Get close to 21 without going over!");
+        Debug.Log("[ROUND START] Player ready - Roll or Stand. Target: Get close to 21!");
     }
 
     public int GetTurnValue()
@@ -338,11 +310,6 @@ public class Player : MonoBehaviour
     public int GetCurrentMoney()
     {
         return currentMoney;
-    }
-
-    public int GetBetAmount()
-    {
-        return betAmount;
     }
 
     public void AddMoney(int amount)
