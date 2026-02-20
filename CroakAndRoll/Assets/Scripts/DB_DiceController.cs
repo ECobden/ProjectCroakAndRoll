@@ -33,6 +33,9 @@ public class DB_DiceController : MonoBehaviour
     [SerializeField] private GameObject destroyHighlightObject;
     [SerializeField] private GameObject swapHighlightObject;
     
+    [Header("Particle Effects")]
+    [SerializeField] private GameObject destroyParticleEffectPrefab;
+    
     #endregion
 
     #region Private Fields
@@ -193,6 +196,30 @@ public class DB_DiceController : MonoBehaviour
     {
         if (isFlipping) return;
         StartCoroutine(FlipDiceCoroutine(newFaceValue));
+    }
+    
+    /// <summary>
+    /// Destroys the dice with a particle effect if one is assigned.
+    /// </summary>
+    public void DestroyWithEffect()
+    {
+        if (destroyParticleEffectPrefab != null)
+        {
+            GameObject effect = Instantiate(destroyParticleEffectPrefab, transform.position, Quaternion.identity);
+            // Automatically destroy the particle effect after its lifetime
+            ParticleSystem ps = effect.GetComponent<ParticleSystem>();
+            if (ps != null)
+            {
+                Destroy(effect, ps.main.duration + ps.main.startLifetime.constantMax);
+            }
+            else
+            {
+                // Fallback: destroy after 2 seconds if no particle system found
+                Destroy(effect, 2f);
+            }
+        }
+        
+        Destroy(gameObject);
     }
     
     #endregion

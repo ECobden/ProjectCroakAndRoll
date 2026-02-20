@@ -330,7 +330,6 @@ MonoBehaviour:
   moveLerpDuration: 0.5
   flipJumpHeight: 0.3
   flipDuration: 0.5
-  flipRotationSpeed: 720
   audioSource: {fileID: 5837244478513237637}
   rollSound: {fileID: 0}
   collisionSounds:
@@ -340,9 +339,9 @@ MonoBehaviour:
   - {fileID: 8300000, guid: f7e71ed8a2a7a914789399e4ffb61c2d, type: 3}
   minCollisionVelocity: 0.5
   collisionCooldown: 0.1
-  facePositionsPrefab: {fileID: 7933595705513872674, guid: d992e634c4f739e4fb569efeb058d0a2, type: 3}
   destroyHighlightObject: {fileID: 479331340397631884}
   swapHighlightObject: {fileID: 6250263266430740617}
+  destroyParticleEffectPrefab: {fileID: 2720232870964781117, guid: eb300f0f67749974a99e372ebac885e9, type: 3}
 --- !u!82 &5837244478513237637
 AudioSource:
   m_ObjectHideFlags: 0

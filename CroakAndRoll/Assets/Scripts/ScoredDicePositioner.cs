@@ -140,9 +140,9 @@ public class ScoredDicePositioner : MonoBehaviour
         foreach (var row in diceRows)
         {
             if (row.diceA != null)
-                Destroy(row.diceA.gameObject);
+                row.diceA.DestroyWithEffect();
             if (row.diceB != null)
-                Destroy(row.diceB.gameObject);
+                row.diceB.DestroyWithEffect();
         }
         
         diceRows.Clear();
@@ -185,7 +185,7 @@ public class ScoredDicePositioner : MonoBehaviour
         {
             if (row.diceA == die)
             {
-                Destroy(row.diceA.gameObject);
+                row.diceA.DestroyWithEffect();
                 row.diceA = null;
                 Debug.Log($"{gameObject.name}: Removed diceA from row {row.rowIndex}");
                 
@@ -195,7 +195,7 @@ public class ScoredDicePositioner : MonoBehaviour
             }
             if (row.diceB == die)
             {
-                Destroy(row.diceB.gameObject);
+                row.diceB.DestroyWithEffect();
                 row.diceB = null;
                 Debug.Log($"{gameObject.name}: Removed diceB from row {row.rowIndex}");
                 

@@ -216,12 +216,12 @@ public class DB_DiceManager : MonoBehaviour
         // Clear current rolling dice
         if (diceControllerA != null)
         {
-            Destroy(diceControllerA.gameObject);
+            diceControllerA.DestroyWithEffect();
             diceControllerA = null;
         }
         if (diceControllerB != null)
         {
-            Destroy(diceControllerB.gameObject);
+            diceControllerB.DestroyWithEffect();
             diceControllerB = null;
         }
         
