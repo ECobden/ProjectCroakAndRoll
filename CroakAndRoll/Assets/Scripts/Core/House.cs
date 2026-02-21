@@ -3,7 +3,11 @@ using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 
-public class House : MonoBehaviour
+/// <summary>
+/// House (Opponent) entity - inherits common game logic from Participant base class.
+/// Contains AI logic to make decisions whether to roll or stand.
+/// </summary>
+public class House : Participant
 {
     [Header("UI Elements")]
     [SerializeField] private TextMeshProUGUI moneyText;
@@ -12,14 +16,7 @@ public class House : MonoBehaviour
     [SerializeField] private float autoRollDelay = 1f;
 
     [Header("Money System")]
-    [SerializeField] private int startingMoney = 1000;
     [SerializeField] private float winMultiplier = 1.5f;
-    private int currentMoney;
-
-    [Header("Manager References")]
-    [SerializeField] private DB_GameManager gameManager;
-    [SerializeField] private DB_DiceManager diceManager;
-    [SerializeField] private DB_UIManager uiManager;
 
     [Header("Turn State")]
     private int turnValue = 0;
@@ -32,21 +29,18 @@ public class House : MonoBehaviour
     [SerializeField] [Range(0f, 1f)] private float cautiousness = 0.7f; // How risk-averse (0=reckless, 1=very cautious)
     [SerializeField] private int safeThreshold = 17; // Total at which house becomes more cautious
 
-    private void Awake()
+    protected override void Awake()
     {
-        // Validate references
-        if (gameManager == null) Debug.LogError("GameManager not assigned to House!");
-        if (diceManager == null) Debug.LogError("DiceManager not assigned to House!");
-        if (uiManager == null) Debug.LogError("UIManager not assigned to House!");
+        base.Awake();
     }
 
-    void Start()
+    protected override void Start()
     {
-        currentMoney = startingMoney;
+        base.Start();
         UpdateMoneyUI();
     }
 
-    public void OnRoundStart()
+    public override void OnRoundStart()
     {
         turnValue = 0;
         lastRollValue = 0;
@@ -81,7 +75,7 @@ public class House : MonoBehaviour
         RollDice();
     }
 
-    public void RollDice()
+    public override void RollDice()
     {
         if (gameManager == null)
         {
@@ -120,6 +114,7 @@ public class House : MonoBehaviour
         if (gameManager != null)
         {
             gameManager.OnAlternatingRoll(diceAValue, diceBValue, false);
+            RecordRoll(diceAValue, diceBValue);
         }
     }
 
@@ -136,7 +131,7 @@ public class House : MonoBehaviour
         }
     }
 
-    public int GetCurrentMoney()
+    public new int GetCurrentMoney()
     {
         return currentMoney;
     }
@@ -172,9 +167,9 @@ public class House : MonoBehaviour
         return totalPayout;
     }
 
-    public void ResetMoney()
+    public override void ResetMoney()
     {
-        currentMoney = startingMoney;
+        base.ResetMoney();
         UpdateMoneyUI();
     }
 
@@ -324,12 +319,12 @@ public class House : MonoBehaviour
         return targetValue;
     }
     
-    /// <summary>
-    /// House decides to stand
-    /// </summary>
-    private void Stand()
+    #endregion
+    
+    public override void Stand()
     {
         Debug.Log($"[HOUSE STAND] House stands with {GetTurnValue()}");
+        SetHasStood(true);
         
         if (gameManager != null)
         {
@@ -340,6 +335,4 @@ public class House : MonoBehaviour
             }
         }
     }
-    
-    #endregion
 }

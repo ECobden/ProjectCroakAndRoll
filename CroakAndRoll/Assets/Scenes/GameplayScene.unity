@@ -13303,13 +13303,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b1a46ce74bc56d641b27cffd410285d6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::House
-  moneyText: {fileID: 0}
-  autoRollDelay: 1
   startingMoney: 1000
-  winMultiplier: 1.5
   gameManager: {fileID: 1991118090}
   diceManager: {fileID: 1216481608}
   uiManager: {fileID: 85049699}
+  moneyText: {fileID: 0}
+  autoRollDelay: 1
+  winMultiplier: 1.5
   cautiousness: 0.7
   safeThreshold: 17
 --- !u!1001 &1214840838
@@ -14710,11 +14710,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bcbbadc48cd91114996a60c8ada55abd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Player
-  moneyController: {fileID: 882317244}
   startingMoney: 10
   gameManager: {fileID: 1991118090}
   diceManager: {fileID: 1216481608}
   uiManager: {fileID: 85049699}
+  moneyController: {fileID: 882317244}
 --- !u!1 &1334822098
 GameObject:
   m_ObjectHideFlags: 0
@@ -21683,7 +21683,6 @@ MonoBehaviour:
   roundManager: {fileID: 700529468}
   diceManager: {fileID: 1216481608}
   uiManager: {fileID: 85049699}
-  ruleSystem: {fileID: 1334822100}
   restartKey: 114
   newRoundDelay: 1.5
 --- !u!4 &1991118091

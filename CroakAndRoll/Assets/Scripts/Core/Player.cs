@@ -4,37 +4,27 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine.UI;
 
-public class Player : MonoBehaviour
+/// <summary>
+/// Player entity - inherits common game logic from Participant base class.
+/// Listens for user input and passes commands to GameManager.
+/// </summary>
+public class Player : Participant
 {
     [Header("UI Elements")]
     [SerializeField] private UI_MoneyController moneyController;
 
-    [Header("Money System")]
-    [SerializeField] private int startingMoney = 1000;
-    private int currentMoney;
-
-    [Header("Manager References")]
-    [SerializeField] private DB_GameManager gameManager;
-    [SerializeField] private DB_DiceManager diceManager;
-    [SerializeField] private DB_UIManager uiManager;
-
     [Header("Turn State")]
     private int turnValue = 0;
-    private int rollCount = 0;
-    private bool canAct = false;
     private bool hasRolledThisTurn = false;
 
-    private void Awake()
+    protected override void Awake()
     {
-        // Validate references
-        if (gameManager == null) Debug.LogError("GameManager not assigned to Player!");
-        if (diceManager == null) Debug.LogError("DiceManager not assigned to Player!");
-        if (uiManager == null) Debug.LogError("UIManager not assigned to Player!");
+        base.Awake();
     }
 
-    void Start()
+    protected override void Start()
     {
-        currentMoney = startingMoney;
+        base.Start();
         
         if (moneyController != null)
             moneyController.SetMoneyValue(currentMoney);
@@ -45,16 +35,9 @@ public class Player : MonoBehaviour
         if (!canAct || gameManager == null) return;
     }
 
-    public void RollDice()
+    public override void RollDice()
     {
         if (!canAct || gameManager == null || gameManager.IsDiceRolling()) return;
-        
-        // Check if we're in rule decision mode
-        if (gameManager.IsWaitingForPlayerRuleDecision())
-        {
-            gameManager.OnPlayerEndTurnDuringRuleDecision();
-            return;
-        }
         
         gameManager.RollSharedDice(OnDiceRolled, true); // true = player turn
     }
@@ -66,10 +49,11 @@ public class Player : MonoBehaviour
         {
             gameManager.OnAlternatingRoll(diceAValue, diceBValue, true);
             hasRolledThisTurn = true;
+            RecordRoll(diceAValue, diceBValue);
         }
     }
 
-    public void OnRoundStart(int selectedBetAmount)
+    public override void OnRoundStart()
     {
         turnValue = 0;
         rollCount = 0;
@@ -92,7 +76,7 @@ public class Player : MonoBehaviour
         return turnValue;
     }
     
-    public int GetRollCount()
+    public new int GetRollCount()
     {
         return rollCount;
     }
@@ -102,7 +86,7 @@ public class Player : MonoBehaviour
         return hasRolledThisTurn;
     }
 
-    public void Stand()
+    public override void Stand()
     {
         if (!canAct)
         {
@@ -116,6 +100,8 @@ public class Player : MonoBehaviour
             return;
         }
 
+        SetHasStood(true);
+        
         if (gameManager != null)
         {
             gameManager.OnPlayerStandInAlternating();
@@ -130,21 +116,20 @@ public class Player : MonoBehaviour
         }
     }
 
-    public int GetCurrentMoney()
+    public new int GetCurrentMoney()
     {
         return currentMoney;
     }
 
-    public void AddMoney(int amount)
+    public override void AddMoney(int amount)
     {
-        currentMoney += amount;
+        base.AddMoney(amount);
         UpdateMoneyUI();
-        Debug.Log($"Player received {amount}. Total money: {currentMoney}");
     }
 
-    public void ResetMoney()
+    public override void ResetMoney()
     {
-        currentMoney = startingMoney;
+        base.ResetMoney();
         UpdateMoneyUI();
     }
 }

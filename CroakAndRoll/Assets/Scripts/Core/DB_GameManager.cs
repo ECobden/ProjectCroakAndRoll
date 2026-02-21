@@ -77,7 +77,6 @@ public class DB_GameManager : MonoBehaviour
     [SerializeField] private DB_RoundManager roundManager;
     [SerializeField] private DB_DiceManager diceManager;
     [SerializeField] private DB_UIManager uiManager;
-    [SerializeField] private DB_DiceRuleSystem ruleSystem;
 
     [Header("Game Settings")]
     [SerializeField] private KeyCode restartKey = KeyCode.R;
@@ -93,11 +92,7 @@ public class DB_GameManager : MonoBehaviour
     private bool playerWonCurrentRound = false;
     private bool buttonsInitialized = false;
     
-    // Rule decision system
-    private bool isWaitingForPlayerRuleDecision = false;
-    private List<int> currentMatchingDice = new List<int>();
-    private List<int> currentSwappableDice = new List<int>();
-    private List<DB_DiceController> diceBeingFlipped = new List<DB_DiceController>();
+
     
     // Turn System State (condensed)
     private TurnMode currentTurnMode = TurnMode.PlayerTurn;
@@ -337,12 +332,6 @@ public class DB_GameManager : MonoBehaviour
         // Clear scored dice from previous round
         if (diceManager != null)
             diceManager.ClearScoredDice();
-        
-        // Clear rule decision state
-        isWaitingForPlayerRuleDecision = false;
-        currentMatchingDice.Clear();
-        currentSwappableDice.Clear();
-        diceBeingFlipped.Clear();
     }
     
     private void UpdateRoundUI()
@@ -441,7 +430,7 @@ public class DB_GameManager : MonoBehaviour
     private void InitializePlayers()
     {
         if (player != null)
-            player.OnRoundStart(0);
+            player.OnRoundStart();
         if (house != null)
             house.OnRoundStart();
     }
@@ -735,9 +724,6 @@ public class DB_GameManager : MonoBehaviour
         // Add roll to round manager
         AddRoll(diceA, diceB, isPlayer);
         
-        // Check for rule actions BEFORE calculating final total
-        yield return StartCoroutine(CheckAndExecuteRuleActions(diceA, diceB, isPlayer));
-        
         // Update totals from dice manager
         UpdateRoundTotals();
         
@@ -801,134 +787,13 @@ public class DB_GameManager : MonoBehaviour
         }
     }
     
-    private IEnumerator CheckAndExecuteRuleActions(int diceA, int diceB, bool isPlayer)
-    {
-        if (diceManager == null || ruleSystem == null) yield break;
-        
-        ScoredDicePositioner currentPos = isPlayer ? diceManager.GetPlayerScoringPositioner() : diceManager.GetHouseScoringPositioner();
-        ScoredDicePositioner opponentPos = isPlayer ? diceManager.GetHouseScoringPositioner() : diceManager.GetPlayerScoringPositioner();
-        
-        if (currentPos == null || opponentPos == null) yield break;
-        
-        // Check for available rule actions
-        var (matchingDice, swappableDice) = ruleSystem.CheckAvailableRules(diceA, diceB, opponentPos);
-        
-        // If no rule actions available, continue
-        if (matchingDice.Count == 0 && swappableDice.Count == 0)
-            yield break;
-        
-        // Present choices and execute action
-        if (isPlayer)
-        {
-            // Player gets to make decision via UI
-            yield return StartCoroutine(PresentPlayerRuleChoices(matchingDice, swappableDice, opponentPos));
-        }
-        else
-        {
-            // House AI decision
-            yield return StartCoroutine(ruleSystem.ExecuteHouseAIDecision(matchingDice, swappableDice, opponentPos));
-            UpdatePlayerScoreDisplay(); // Update after house destroys/swaps
-        }
-    }
+
     
-    private IEnumerator PresentPlayerRuleChoices(List<int> matchingDice, List<int> swappableDice, ScoredDicePositioner opponentPos)
-    {
-        if (ruleSystem == null) yield break;
-        
-        Debug.Log($"Presenting player choices - Matching: {string.Join(",", matchingDice)}, Swappable: {string.Join(",", swappableDice)}");
-        
-        // Store current choices
-        currentMatchingDice = new List<int>(matchingDice);
-        currentSwappableDice = new List<int>(swappableDice);
-        
-        // Highlight available actions using rule system
-        ruleSystem.HighlightAvailableActions(matchingDice, swappableDice, opponentPos, OnPlayerClickedOpponentDie);
-        
-        // Change button to "End Turn"
-        isWaitingForPlayerRuleDecision = true;
-        if (uiManager != null)
-        {
-            uiManager.SetRollButtonText("End Turn");
-            uiManager.EnableRollButton();
-            uiManager.UpdateGoalText("Click dice to destroy or End Turn");
-        }
-        
-        // Wait for player to make choice or end turn
-        while (isWaitingForPlayerRuleDecision)
-        {
-            yield return null;
-        }
-        
-        // If swap occurred, wait for flip animations to complete
-        if (diceBeingFlipped.Count > 0)
-        {
-            Debug.Log("Waiting for dice flip animations to complete...");
-            while (diceBeingFlipped.Any(die => die != null && die.IsFlipping()))
-            {
-                yield return null;
-            }
-            Debug.Log("Dice flip animations completed");
-            diceBeingFlipped.Clear();
-            
-            // Small delay for visual clarity
-            yield return new WaitForSeconds(0.3f);
-        }
-        
-        // Clear highlights
-        ruleSystem.ClearHighlights(opponentPos);
-        
-        // Restore button text
-        if (uiManager != null)
-        {
-            uiManager.SetRollButtonText("Roll");
-        }
-    }
+
     
-    private void OnPlayerClickedOpponentDie(DB_DiceController clickedDie)
-    {
-        if (!isWaitingForPlayerRuleDecision || diceManager == null || ruleSystem == null) return;
-        
-        int dieValue = clickedDie.GetLastRollValue();
-        Debug.Log($"Player clicked opponent's die with value {dieValue}");
-        
-        var playerPos = diceManager.GetPlayerScoringPositioner();
-        var opponentPos = diceManager.GetHouseScoringPositioner();
-        
-        // Check if this die can be destroyed (matching dice rule)
-        if (ruleSystem.CanDestroyDie(dieValue, currentMatchingDice))
-        {
-            ruleSystem.DestroyDie(clickedDie, opponentPos);
-            isWaitingForPlayerRuleDecision = false;
-            return;
-        }
-        
-        // Check if this die can be swapped (±1 dice rule)
-        if (currentSwappableDice.Count > 0)
-        {
-            DB_DiceController playerDieToSwap = ruleSystem.FindSwappablePlayerDie(clickedDie, playerPos, currentSwappableDice);
-            
-            if (playerDieToSwap != null)
-            {
-                // Perform the swap
-                ruleSystem.SwapDice(playerDieToSwap, clickedDie, diceBeingFlipped);
-                
-                // Update both score displays immediately (values already updated in dice)
-                UpdatePlayerScoreDisplay();
-                UpdateHouseScoreDisplay();
-                
-                // End rule decision phase
-                isWaitingForPlayerRuleDecision = false;
-            }
-        }
-    }
+
     
-    public void OnPlayerEndTurnDuringRuleDecision()
-    {
-        if (!isWaitingForPlayerRuleDecision) return;
-        
-        Debug.Log("Player ended turn without using rule action");
-        isWaitingForPlayerRuleDecision = false;
-    }
+
 
     public void OnPlayerStandInAlternating()
     {
@@ -1103,7 +968,6 @@ public class DB_GameManager : MonoBehaviour
     // State queries
     public GameState GetCurrentState() => currentState;
     public bool IsDiceRolling() => diceManager != null && diceManager.IsDiceRolling();
-    public bool IsWaitingForPlayerRuleDecision() => isWaitingForPlayerRuleDecision;
     
     // UI control
     public void DisableGameplayButtons()
