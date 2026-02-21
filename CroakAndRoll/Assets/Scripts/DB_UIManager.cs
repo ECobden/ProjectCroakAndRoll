@@ -22,23 +22,6 @@ public class DB_UIManager : MonoBehaviour
     [SerializeField] private Button restartButton;
     [SerializeField] private TurnMarker turnMarker;
     
-    [Header("Heat Display")]
-    [SerializeField] private UI_HeatController heatController;
-    
-    [Header("Lives Display")]
-    [SerializeField] private UI_LivesController livesController;
-    
-    [Header("Heat Decision Panel")]
-    [SerializeField] private GameObject heatDecisionPanel;
-    [SerializeField] private TextMeshProUGUI heatDecisionMessageText;
-    [SerializeField] private Button increaseHeatButton;
-    [SerializeField] private Button cashOutButton;
-    [SerializeField] private TextMeshProUGUI increaseHeatButtonText;
-    [SerializeField] private TextMeshProUGUI cashOutButtonText;
-    
-    [Header("Shop Panel")]
-    [SerializeField] private UI_PerkShopController perkShopController;
-    
     [Header("Round Total Display")]
     [SerializeField] private TextMeshProUGUI playerRoundTotalText;
     [SerializeField] private TextMeshProUGUI houseRoundTotalText;
@@ -71,12 +54,6 @@ public class DB_UIManager : MonoBehaviour
 
         if (gameOverPanel != null)
             gameOverPanel.SetActive(false);
-            
-        if (heatDecisionPanel != null)
-            heatDecisionPanel.SetActive(false);
-            
-        if (perkShopController != null)
-            perkShopController.Hide();
     }
 
     #endregion
@@ -371,108 +348,6 @@ public class DB_UIManager : MonoBehaviour
     {
         if (roundResultController != null)
             roundResultController.ShowHouseCheated();
-    }
-
-    #endregion
-
-    #region Heat Display
-
-    public void UpdateHeatDisplay(int currentHeat, int maxHeat)
-    {
-        if (heatController != null)
-        {
-            heatController.UpdateHeatDisplay(currentHeat, maxHeat);
-        }
-    }
-
-    #endregion
-
-    #region Lives Display
-
-    public void UpdateLivesDisplay(int currentLives, int maxLives)
-    {
-        if (livesController != null)
-        {
-            livesController.UpdateLivesDisplay(currentLives, maxLives);
-        }
-    }
-
-    #endregion
-
-    #region Heat Decision Panel
-
-    public void ShowHeatDecisionPanel(int currentHeat, int currentReward, int nextHeatReward, Action onIncreaseHeat, Action onCashOut)
-    {
-        if (heatDecisionPanel == null) return;
-        
-        heatDecisionPanel.SetActive(true);
-        
-        // Update message text
-        if (heatDecisionMessageText != null)
-        {
-            heatDecisionMessageText.text = $"You Won!\nHeat Level: {currentHeat}";
-        }
-        
-        // Update button texts
-        if (increaseHeatButtonText != null)
-        {
-            if (currentHeat >= 7)
-            {
-                increaseHeatButtonText.text = $"MAX HEAT!\nMust Cash Out";
-            }
-            else
-            {
-                increaseHeatButtonText.text = $"Increase Heat\nNext Win: {nextHeatReward}";
-            }
-        }
-        
-        if (cashOutButtonText != null)
-        {
-            cashOutButtonText.text = $"Cash Out\n{currentReward} Coins";
-        }
-        
-        // Setup button listeners
-        if (increaseHeatButton != null)
-        {
-            increaseHeatButton.onClick.RemoveAllListeners();
-            increaseHeatButton.onClick.AddListener(() => onIncreaseHeat?.Invoke());
-            
-            // Disable if at max heat
-            increaseHeatButton.interactable = currentHeat < 8;
-        }
-        
-        if (cashOutButton != null)
-        {
-            cashOutButton.onClick.RemoveAllListeners();
-            cashOutButton.onClick.AddListener(() => onCashOut?.Invoke());
-        }
-    }
-
-    public void HideHeatDecisionPanel()
-    {
-        if (heatDecisionPanel != null)
-            heatDecisionPanel.SetActive(false);
-    }
-
-    #endregion
-
-    #region Shop Panel
-
-    public void ShowShop(Player player, Action onClose)
-    {
-        if (perkShopController == null)
-        {
-            Debug.LogError("PerkShopController not assigned!");
-            return;
-        }
-        
-        perkShopController.OpenShop(player, onClose);
-    }
-
-    public void HideShop()
-    {
-        if (perkShopController != null)
-            perkShopController.Hide();
     }
 
     #endregion

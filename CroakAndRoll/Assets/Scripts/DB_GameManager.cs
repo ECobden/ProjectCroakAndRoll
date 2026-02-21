@@ -8,9 +8,8 @@ using DG.Tweening;
 
 /// <summary>
 /// Core game manager for Croak and Roll.
-/// Handles game state transitions, dice rolling coordination, and win/loss conditions.
-/// 
-/// Round-specific logic (advantage, turn switching, equal opportunity) is delegated to DB_AlternatingRoundManager.
+/// Handles game state transitions, dice rolling coordination, win/loss conditions, 
+/// and alternating turn system (advantage, turn switching, equal opportunity).
 /// 
 /// Game Structure:
 /// - Game contains multiple rounds
@@ -26,11 +25,44 @@ public class DB_GameManager : MonoBehaviour
         AlternatingTurns,  // Both players alternating rolls
         PlayerStanding,    // Player has stood, transitioning to house solo
         RoundOver,         // Round ending, determining winner
-        GameOver,          // Game completely over
+        GameOver           // Game completely over
+    }
+    
+    public enum TurnMode
+    {
+        PlayerTurn,           // Player's turn to roll
+        HouseTurn,            // House's turn to roll (alternating)
+        HouseSolo,            // House rolling solo after player stood
+        WaitingForEquality    // Opponent getting equal opportunity after win/bust
+    }
+    
+    /// <summary>
+    /// Represents a single roll in the round history
+    /// </summary>
+    [System.Serializable]
+    public class RollRow
+    {
+        public int diceA;
+        public int diceB;
+        public int rollTotal;
         
-        // Legacy states - kept for potential future use
-        PlayerTurn,        // Legacy: Player rolling dice (not used in alternating system)
-        HouseTurn          // Legacy: House rolling dice (not used in alternating system)
+        public RollRow(int a, int b)
+        {
+            diceA = a;
+            diceB = b;
+            rollTotal = a + b;
+        }
+    }
+    
+    /// <summary>
+    /// Result of checking round win conditions
+    /// </summary>
+    public enum RoundResult
+    {
+        None,
+        PlayerWins,
+        HouseWins,
+        Continue
     }
     
     #endregion
@@ -43,9 +75,9 @@ public class DB_GameManager : MonoBehaviour
 
     [Header("Managers")]
     [SerializeField] private DB_RoundManager roundManager;
-    [SerializeField] private DB_AlternatingRoundManager alternatingRoundManager;
     [SerializeField] private DB_DiceManager diceManager;
     [SerializeField] private DB_UIManager uiManager;
+    [SerializeField] private DB_DiceRuleSystem ruleSystem;
 
     [Header("Game Settings")]
     [SerializeField] private KeyCode restartKey = KeyCode.R;
@@ -66,6 +98,17 @@ public class DB_GameManager : MonoBehaviour
     private List<int> currentMatchingDice = new List<int>();
     private List<int> currentSwappableDice = new List<int>();
     private List<DB_DiceController> diceBeingFlipped = new List<DB_DiceController>();
+    
+    // Turn System State (condensed)
+    private TurnMode currentTurnMode = TurnMode.PlayerTurn;
+    private bool playerHasAdvantage = true;        // Who gets first turn at round start
+    private bool isWaitingForHouseRoll = false;    // Prevents duplicate house roll triggers
+    
+    // Round Tracking
+    private int playerRoundTotal = 0;              // Player's total score this round
+    private int houseRoundTotal = 0;               // House's total score this round
+    private List<RollRow> playerRollRows = new List<RollRow>();  // Player's roll history
+    private List<RollRow> houseRollRows = new List<RollRow>();   // House's roll history
     
     #endregion
 
@@ -119,14 +162,14 @@ public class DB_GameManager : MonoBehaviour
     /// </summary>
     private void UpdatePlayerScoreDisplay()
     {
-        if (diceManager == null || uiManager == null || alternatingRoundManager == null) return;
+        if (diceManager == null || uiManager == null) return;
         
         var playerPos = diceManager.GetPlayerScoringPositioner();
         if (playerPos != null)
         {
-            alternatingRoundManager.UpdateRoundTotals();
-            uiManager.UpdatePlayerRoundTotal(alternatingRoundManager.PlayerRoundTotal);
-            Debug.Log($"Player score updated: {alternatingRoundManager.PlayerRoundTotal}");
+            UpdateRoundTotals();
+            uiManager.UpdatePlayerRoundTotal(playerRoundTotal);
+            Debug.Log($"Player score updated: {playerRoundTotal}");
         }
     }
     
@@ -135,14 +178,14 @@ public class DB_GameManager : MonoBehaviour
     /// </summary>
     private void UpdateHouseScoreDisplay()
     {
-        if (diceManager == null || uiManager == null || alternatingRoundManager == null) return;
+        if (diceManager == null || uiManager == null) return;
         
         var housePos = diceManager.GetHouseScoringPositioner();
         if (housePos != null)
         {
-            alternatingRoundManager.UpdateRoundTotals();
-            uiManager.UpdateHouseRoundTotal(alternatingRoundManager.HouseRoundTotal);
-            Debug.Log($"House score updated: {alternatingRoundManager.HouseRoundTotal}");
+            UpdateRoundTotals();
+            uiManager.UpdateHouseRoundTotal(houseRoundTotal);
+            Debug.Log($"House score updated: {houseRoundTotal}");
         }
     }
     
@@ -175,16 +218,6 @@ public class DB_GameManager : MonoBehaviour
     {
         switch (state)
         {
-            case GameState.PlayerTurn:
-                if (uiManager != null)
-                    uiManager.DisableGameplayButtons();
-                break;
-                
-            case GameState.HouseTurn:
-                if (uiManager != null)
-                    uiManager.ClearScoreText();
-                break;
-                
             case GameState.RoundOver:
                 // Reset goal text state for new round
                 if (uiManager != null)
@@ -202,17 +235,8 @@ public class DB_GameManager : MonoBehaviour
                 break;
                 
             case GameState.PlayerStanding:
-                if (previousState == GameState.AlternatingTurns)
-                {
-                    if (alternatingRoundManager != null)
-                        alternatingRoundManager.SetPlayerStood();
-                    StartCoroutine(ContinueHouseSolo());
-                }
-                else
-                {
-                    // Fallback to legacy behavior if needed
-                    TransitionToState(GameState.HouseTurn);
-                }
+                SetPlayerStood();
+                StartCoroutine(ContinueHouseSolo());
                 break;
                 
             case GameState.RoundOver:
@@ -223,70 +247,7 @@ public class DB_GameManager : MonoBehaviour
                 if (uiManager != null)
                     uiManager.ShowGameOverPanel();
                 break;
-                
-            // Legacy states - keep for backward compatibility
-            case GameState.PlayerTurn:
-                StartPlayerTurnInternal();
-                break;
-                
-            case GameState.HouseTurn:
-                StartHouseTurnInternal();
-                break;
         }
-    }
-    
-    #endregion
-
-    #region Turn Management (Legacy - for backward compatibility)
-
-    private void StartPlayerTurnInternal()
-    {
-        if (uiManager != null)
-        {
-            uiManager.UpdateGoalText("Roll Closest to 21");
-            uiManager.SetTurnMarkerToPlayer();
-        }
-    }
-
-    private void StartHouseTurnInternal()
-    {
-        if (player != null && uiManager != null)
-        {
-            int playerScore = player.GetTurnValue();
-            uiManager.UpdateGoalText($"House must roll {playerScore} to win");
-        }
-        
-        if (uiManager != null)
-            uiManager.SetTurnMarkerToHouse();
-
-        if (house != null)
-            house.OnRoundStart(); // Legacy mode - now called OnRoundStart for consistency
-        else
-            Debug.LogError("House is null! Cannot start house turn.");
-    }
-
-    public void StartPlayerTurn() => TransitionToState(GameState.PlayerTurn);
-
-    public void EndPlayerTurn()
-    {
-        if (currentState != GameState.PlayerTurn)
-        {
-            Debug.LogWarning($"EndPlayerTurn called but not in PlayerTurn state. Current: {currentState}");
-            return;
-        }
-        TransitionToState(GameState.PlayerStanding);
-    }
-
-    public void StartHouseTurn() => TransitionToState(GameState.HouseTurn);
-
-    public void EndHouseTurn()
-    {
-        if (currentState != GameState.HouseTurn)
-        {
-            Debug.LogWarning($"EndHouseTurn called but not in HouseTurn state. Current: {currentState}");
-            return;
-        }
-        TransitionToState(GameState.RoundOver);
     }
     
     #endregion
@@ -365,8 +326,7 @@ public class DB_GameManager : MonoBehaviour
         PrepareRoundUI();
         
         // 4. Initialize round through alternating round manager
-        if (alternatingRoundManager != null)
-            alternatingRoundManager.InitializeRound();
+        InitializeRound();
         
         // 5. Start the alternating turn system
         TransitionToState(GameState.AlternatingTurns);
@@ -424,15 +384,305 @@ public class DB_GameManager : MonoBehaviour
     #endregion
 
     #region Alternating Turn System
+    
+    // ========== Core Round Management (Merged from DB_AlternatingRoundManager) ==========
+    
+    /// <summary>
+    /// Initialize a new round - resets all state and determines advantage
+    /// </summary>
+    private void InitializeRound()
+    {
+        Debug.Log("=== AlternatingRoundManager: Initializing Round ===");
+        
+        // Reset all state
+        ResetRoundState();
+        
+        // Determine who goes first
+        DetermineAdvantage();
+        
+        // Initialize player/house for new round
+        InitializePlayers();
+    }
+    
+    /// <summary>
+    /// Reset all round state variables
+    /// </summary>
+    private void ResetRoundState()
+    {
+        playerRollRows.Clear();
+        houseRollRows.Clear();
+        playerRoundTotal = 0;
+        houseRoundTotal = 0;
+        isWaitingForHouseRoll = false;
+        
+        // Note: playerHasAdvantage and currentTurnMode will be set by DetermineAdvantage()
+    }
+    
+    /// <summary>
+    /// Determine who has advantage this round (goes first)
+    /// </summary>
+    private void DetermineAdvantage()
+    {
+        playerHasAdvantage = Random.value < 0.5f;
+        currentTurnMode = playerHasAdvantage ? TurnMode.PlayerTurn : TurnMode.HouseTurn;
+        
+        Debug.Log($"[ADVANTAGE] {(playerHasAdvantage ? "PLAYER" : "HOUSE")} gets first turn");
+        
+        if (uiManager != null)
+        {
+            string advantageText = playerHasAdvantage ? "You have advantage!" : "House has advantage!";
+            uiManager.UpdateGoalText(advantageText);
+        }
+    }
+    
+    /// <summary>
+    /// Initialize players for the round
+    /// </summary>
+    private void InitializePlayers()
+    {
+        if (player != null)
+            player.OnRoundStart(0);
+        if (house != null)
+            house.OnRoundStart();
+    }
+    
+    /// <summary>
+    /// Prepare UI for alternating turns at round start
+    /// </summary>
+    private void PrepareAlternatingTurnsUI()
+    {
+        if (uiManager == null) return;
+        
+        bool isPlayerTurn = (currentTurnMode == TurnMode.PlayerTurn);
+        Debug.Log($"[TURN START] {(isPlayerTurn ? "Player" : "House")}'s turn begins");
+        
+        // Update UI based on whose turn it is
+        if (isPlayerTurn)
+        {
+            uiManager.SetTurnMarkerToPlayer();
+            uiManager.EnableRollButton();
+            uiManager.UpdateGoalText("Your turn - Roll closest to 21");
+        }
+        else
+        {
+            uiManager.SetTurnMarkerToHouse();
+            uiManager.DisableGameplayButtons();
+            uiManager.UpdateGoalText("House's turn");
+        }
+    }
+    
+    /// <summary>
+    /// Add a roll to the current roller's history
+    /// </summary>
+    private void AddRoll(int diceA, int diceB, bool isPlayer)
+    {
+        if (isPlayer)
+        {
+            playerRollRows.Add(new RollRow(diceA, diceB));
+            
+            // Enable Stand button after first roll
+            if (uiManager != null && playerRollRows.Count == 1)
+            {
+                uiManager.EnableStandButton();
+            }
+        }
+        else
+        {
+            houseRollRows.Add(new RollRow(diceA, diceB));
+        }
+    }
+    
+    /// <summary>
+    /// Update round totals from dice manager
+    /// </summary>
+    private void UpdateRoundTotals()
+    {
+        if (diceManager == null) return;
+        
+        var playerPos = diceManager.GetPlayerScoringPositioner();
+        var housePos = diceManager.GetHouseScoringPositioner();
+        
+        if (playerPos != null)
+        {
+            playerRoundTotal = playerPos.GetTotalScore();
+        }
+        
+        if (housePos != null)
+        {
+            houseRoundTotal = housePos.GetTotalScore();
+        }
+    }
+    
+    /// <summary>
+    /// Switch to the other player's turn
+    /// </summary>
+    private void SwitchTurn()
+    {
+        // Toggle between player and house turns
+        currentTurnMode = (currentTurnMode == TurnMode.PlayerTurn) ? TurnMode.HouseTurn : TurnMode.PlayerTurn;
+        
+        if (uiManager == null) return;
+        
+        bool isPlayerTurn = (currentTurnMode == TurnMode.PlayerTurn);
+        Debug.Log($"[TURN SWITCH] {(isPlayerTurn ? "Player" : "House")}'s turn begins");
+        
+        if (isPlayerTurn)
+        {
+            uiManager.SetTurnMarkerToPlayer();
+            uiManager.EnableRollButton();
+            
+            // Enable stand button if player has already rolled
+            if (playerRollRows.Count > 0)
+            {
+                uiManager.EnableStandButton();
+            }
+            
+            uiManager.UpdateGoalText("Your turn - Roll closest to 21");
+        }
+        else
+        {
+            uiManager.SetTurnMarkerToHouse();
+            uiManager.DisableGameplayButtons();
+            uiManager.UpdateGoalText("House's turn");
+        }
+    }
+    
+    /// <summary>
+    /// Mark that player has stood - house continues solo
+    /// </summary>
+    private void SetPlayerStood()
+    {
+        currentTurnMode = TurnMode.HouseSolo;
+        Debug.Log("Player has stood - house continues solo");
+    }
+    
+    /// <summary>
+    /// Start waiting for house roll (prevents duplicate triggers)
+    /// </summary>
+    private IEnumerator WaitForHouseRoll(float delay = 1f)
+    {
+        if (isWaitingForHouseRoll)
+        {
+            Debug.Log("Already waiting for house roll, skipping duplicate trigger");
+            yield break;
+        }
+        
+        isWaitingForHouseRoll = true;
+        yield return new WaitForSeconds(delay);
+        isWaitingForHouseRoll = false;
+        
+        if (house != null)
+            house.RollDice();
+    }
+    
+    /// <summary>
+    /// Check if the round should end based on current totals and equal opportunity
+    /// </summary>
+    private RoundResult CheckRoundResult(bool isPlayer)
+    {
+        int currentTotal = isPlayer ? playerRoundTotal : houseRoundTotal;
+        int currentRollCount = isPlayer ? playerRollRows.Count : houseRollRows.Count;
+        int opponentRollCount = isPlayer ? houseRollRows.Count : playerRollRows.Count;
+        bool inHouseSolo = (currentTurnMode == TurnMode.HouseSolo);
+        
+        // Check for bust
+        if (currentTotal > 21)
+        {
+            Debug.Log($"{(isPlayer ? "Player" : "House")} BUSTED! Rolls: {currentRollCount} vs {opponentRollCount}");
+            
+            // Check if opponent needs equal opportunity (only in alternating mode)
+            if (opponentRollCount < currentRollCount && !inHouseSolo)
+            {
+                Debug.Log($"{(isPlayer ? "House" : "Player")} needs equal opportunity - giving another turn");
+                currentTurnMode = TurnMode.WaitingForEquality;
+                return RoundResult.Continue;
+            }
+            
+            // Round ends - opponent wins (or house wins if both bust)
+            return isPlayer ? RoundResult.HouseWins : RoundResult.PlayerWins;
+        }
+        
+        // Check for 21
+        if (currentTotal == 21)
+        {
+            Debug.Log($"{(isPlayer ? "Player" : "House")} hit 21! Rolls: {currentRollCount} vs {opponentRollCount}");
+            
+            // Check if opponent needs equal opportunity (only in alternating mode)
+            if (opponentRollCount < currentRollCount && !inHouseSolo)
+            {
+                Debug.Log($"{(isPlayer ? "House" : "Player")} needs equal opportunity - giving another turn");
+                currentTurnMode = TurnMode.WaitingForEquality;
+                return RoundResult.Continue;
+            }
+            
+            // Round ends - current player wins
+            return isPlayer ? RoundResult.PlayerWins : RoundResult.HouseWins;
+        }
+        
+        // Check if equal opportunity has been satisfied
+        if (currentTurnMode == TurnMode.WaitingForEquality)
+        {
+            bool equalityAchieved = isPlayer ? 
+                (playerRollRows.Count >= houseRollRows.Count) : 
+                (houseRollRows.Count >= playerRollRows.Count);
+            
+            if (equalityAchieved)
+            {
+                Debug.Log("Equal opportunity achieved - checking final conditions");
+                
+                // Determine winner after equal opportunity
+                if (houseRoundTotal > 21 && playerRoundTotal > 21)
+                {
+                    Debug.Log($"Both bust - House: {houseRoundTotal}, Player: {playerRoundTotal}");
+                    return RoundResult.HouseWins; // House wins by default if both bust
+                }
+                else if (houseRoundTotal > 21)
+                {
+                    Debug.Log($"House confirmed bust: {houseRoundTotal}, Player: {playerRoundTotal}");
+                    return RoundResult.PlayerWins;
+                }
+                else if (playerRoundTotal > 21)
+                {
+                    Debug.Log($"Player confirmed bust: {playerRoundTotal}, House: {houseRoundTotal}");
+                    return RoundResult.HouseWins;
+                }
+                else if (playerRoundTotal == 21)
+                {
+                    Debug.Log($"Player confirmed 21: {playerRoundTotal}");
+                    return RoundResult.PlayerWins;
+                }
+                else if (houseRoundTotal == 21)
+                {
+                    Debug.Log($"House confirmed 21: {houseRoundTotal}");
+                    return RoundResult.HouseWins;
+                }
+            }
+        }
+        
+        // Check if player wins because house is bust after player stood
+        if (inHouseSolo && houseRoundTotal > 21 && playerRoundTotal <= 21)
+        {
+            Debug.Log($"[PLAYER WINS] House is bust ({houseRoundTotal}), Player stood at {playerRoundTotal}");
+            return RoundResult.PlayerWins;
+        }
+        
+        // Check if house has won after player stood
+        if (inHouseSolo && !isPlayer && houseRoundTotal <= 21 && playerRoundTotal <= 21)
+        {
+            if (houseRoundTotal >= playerRoundTotal)
+            {
+                Debug.Log($"House wins with {houseRoundTotal} vs Player's {playerRoundTotal}");
+                return RoundResult.HouseWins;
+            }
+        }
+        
+        return RoundResult.Continue;
+    }
+    
+    // ========== Alternating Turn Flow ==========
 
     private void StartAlternatingTurns()
     {
-        if (alternatingRoundManager == null)
-        {
-            Debug.LogError("AlternatingRoundManager is null!");
-            return;
-        }
-        
         // Initialize buttons and prepare UI in proper sequence
         if (!buttonsInitialized)
         {
@@ -442,12 +692,12 @@ public class DB_GameManager : MonoBehaviour
         else
         {
             // Buttons already initialized, just prepare UI for this round
-            alternatingRoundManager.PrepareAlternatingTurnsUI();
+            PrepareAlternatingTurnsUI();
             
             // If house has advantage, trigger house roll
-            if (!alternatingRoundManager.IsPlayerCurrentRoller)
+            if (currentTurnMode == TurnMode.HouseTurn)
             {
-                StartCoroutine(alternatingRoundManager.WaitForHouseRoll());
+                StartCoroutine(WaitForHouseRoll());
             }
         }
     }
@@ -463,15 +713,12 @@ public class DB_GameManager : MonoBehaviour
         ));
         
         // THEN prepare UI based on who has advantage (after buttons are shown)
-        if (alternatingRoundManager != null)
+        PrepareAlternatingTurnsUI();
+        
+        // If house has advantage, trigger house roll
+        if (currentTurnMode == TurnMode.HouseTurn)
         {
-            alternatingRoundManager.PrepareAlternatingTurnsUI();
-            
-            // If house has advantage, trigger house roll
-            if (!alternatingRoundManager.IsPlayerCurrentRoller)
-            {
-                StartCoroutine(alternatingRoundManager.WaitForHouseRoll());
-            }
+            StartCoroutine(WaitForHouseRoll());
         }
     }
 
@@ -485,117 +732,86 @@ public class DB_GameManager : MonoBehaviour
     
     private IEnumerator ProcessAlternatingRollWithRules(int diceA, int diceB, bool isPlayer)
     {
-        if (alternatingRoundManager == null) yield break;
-        
         // Add roll to round manager
-        alternatingRoundManager.AddRoll(diceA, diceB, isPlayer);
+        AddRoll(diceA, diceB, isPlayer);
         
         // Check for rule actions BEFORE calculating final total
         yield return StartCoroutine(CheckAndExecuteRuleActions(diceA, diceB, isPlayer));
         
         // Update totals from dice manager
-        alternatingRoundManager.UpdateRoundTotals();
+        UpdateRoundTotals();
         
-        Debug.Log($"{(isPlayer ? "Player" : "House")} round total after rule actions: {(isPlayer ? alternatingRoundManager.PlayerRoundTotal : alternatingRoundManager.HouseRoundTotal)}");
+        Debug.Log($"{(isPlayer ? "Player" : "House")} round total after rule actions: {(isPlayer ? playerRoundTotal : houseRoundTotal)}");
         
         // Check round result
-        var result = alternatingRoundManager.CheckRoundResult(isPlayer);
+        var result = CheckRoundResult(isPlayer);
         
         switch (result)
         {
-            case DB_AlternatingRoundManager.RoundResult.PlayerWins:
+            case RoundResult.PlayerWins:
                 playerWonCurrentRound = true;
                 TransitionToState(GameState.RoundOver);
                 yield break;
                 
-            case DB_AlternatingRoundManager.RoundResult.HouseWins:
+            case RoundResult.HouseWins:
                 playerWonCurrentRound = false;
                 TransitionToState(GameState.RoundOver);
                 yield break;
                 
-            case DB_AlternatingRoundManager.RoundResult.Continue:
+            case RoundResult.Continue:
                 // Continue with turn logic below
                 break;
         }
         
-        // Switch turns or continue house solo
-        if (isPlayer)
+        // Handle turn progression based on current mode
+        if (currentTurnMode == TurnMode.HouseSolo)
         {
-            // Switch to house's turn (unless player has stood)
-            if (!alternatingRoundManager.PlayerHasStood)
+            // House continues rolling solo
+            if (houseRoundTotal <= 21)
             {
-                alternatingRoundManager.SwitchTurn();
-                StartCoroutine(alternatingRoundManager.WaitForHouseRoll());
+                StartCoroutine(WaitForHouseRoll());
+            }
+            else
+            {
+                // House is bust and player has stood - player wins
+                Debug.Log($"House is bust ({houseRoundTotal}), player stood at {playerRoundTotal} - Player wins!");
+                playerWonCurrentRound = true;
+                TransitionToState(GameState.RoundOver);
+            }
+        }
+        else if (currentTurnMode == TurnMode.WaitingForEquality)
+        {
+            // Give opponent their equal opportunity turn (opposite of who just rolled)
+            currentTurnMode = isPlayer ? TurnMode.HouseTurn : TurnMode.PlayerTurn;
+            Debug.Log($"[EQUAL OPPORTUNITY] Giving {(currentTurnMode == TurnMode.HouseTurn ? "House" : "Player")} their equal opportunity turn");
+            
+            if (currentTurnMode == TurnMode.HouseTurn)
+            {
+                StartCoroutine(WaitForHouseRoll());
             }
         }
         else
         {
-            // Switch to player's turn (unless in solo mode)
-            if (!alternatingRoundManager.PlayerHasStood)
+            // Normal alternating turns
+            SwitchTurn();
+            if (currentTurnMode == TurnMode.HouseTurn)
             {
-                alternatingRoundManager.SwitchTurn();
-            }
-            else
-            {
-                // House continues rolling solo - but only if house isn't bust
-                if (alternatingRoundManager.HouseRoundTotal <= 21)
-                {
-                    StartCoroutine(alternatingRoundManager.WaitForHouseRoll());
-                }
-                else
-                {
-                    // House is bust and player has stood - player wins
-                    Debug.Log($"House is bust ({alternatingRoundManager.HouseRoundTotal}), player stood at {alternatingRoundManager.PlayerRoundTotal} - Player wins!");
-                    playerWonCurrentRound = true;
-                    TransitionToState(GameState.RoundOver);
-                }
+                StartCoroutine(WaitForHouseRoll());
             }
         }
     }
     
     private IEnumerator CheckAndExecuteRuleActions(int diceA, int diceB, bool isPlayer)
     {
-        if (diceManager == null) yield break;
+        if (diceManager == null || ruleSystem == null) yield break;
         
         ScoredDicePositioner currentPos = isPlayer ? diceManager.GetPlayerScoringPositioner() : diceManager.GetHouseScoringPositioner();
         ScoredDicePositioner opponentPos = isPlayer ? diceManager.GetHouseScoringPositioner() : diceManager.GetPlayerScoringPositioner();
         
         if (currentPos == null || opponentPos == null) yield break;
         
-        // Get opponent's dice values and last row
-        List<int> opponentDiceValues = opponentPos.GetAllDiceValues();
-        var opponentLastRow = opponentPos.GetLastRow();
-        
-        // Check Rule 1: Matching dice
-        List<int> matchingDice = new List<int>();
-        if (opponentDiceValues.Contains(diceA))
-            matchingDice.Add(diceA);
-        if (opponentDiceValues.Contains(diceB) && !matchingDice.Contains(diceB))
-            matchingDice.Add(diceB);
-        
-        // Check Rule 2: ±1 dice
-        List<int> swappableDice = new List<int>();
-        if (opponentLastRow != null)
-        {
-            int lastDiceA = opponentLastRow.diceA != null ? opponentLastRow.diceA.GetLastRollValue() : -1;
-            int lastDiceB = opponentLastRow.diceB != null ? opponentLastRow.diceB.GetLastRollValue() : -1;
-            
-            if (lastDiceA > 0 && (Mathf.Abs(diceA - lastDiceA) == 1 || Mathf.Abs(diceB - lastDiceA) == 1))
-            {
-                if (Mathf.Abs(diceA - lastDiceA) == 1 && !swappableDice.Contains(diceA))
-                    swappableDice.Add(diceA);
-                if (Mathf.Abs(diceB - lastDiceA) == 1 && !swappableDice.Contains(diceB))
-                    swappableDice.Add(diceB);
-            }
-            
-            if (lastDiceB > 0 && (Mathf.Abs(diceA - lastDiceB) == 1 || Mathf.Abs(diceB - lastDiceB) == 1))
-            {
-                if (Mathf.Abs(diceA - lastDiceB) == 1 && !swappableDice.Contains(diceA))
-                    swappableDice.Add(diceA);
-                if (Mathf.Abs(diceB - lastDiceB) == 1 && !swappableDice.Contains(diceB))
-                    swappableDice.Add(diceB);
-            }
-        }
+        // Check for available rule actions
+        var (matchingDice, swappableDice) = ruleSystem.CheckAvailableRules(diceA, diceB, opponentPos);
         
         // If no rule actions available, continue
         if (matchingDice.Count == 0 && swappableDice.Count == 0)
@@ -610,65 +826,23 @@ public class DB_GameManager : MonoBehaviour
         else
         {
             // House AI decision
-            yield return StartCoroutine(ExecuteHouseRuleDecision(matchingDice, swappableDice, opponentPos));
+            yield return StartCoroutine(ruleSystem.ExecuteHouseAIDecision(matchingDice, swappableDice, opponentPos));
+            UpdatePlayerScoreDisplay(); // Update after house destroys/swaps
         }
     }
     
     private IEnumerator PresentPlayerRuleChoices(List<int> matchingDice, List<int> swappableDice, ScoredDicePositioner opponentPos)
     {
+        if (ruleSystem == null) yield break;
+        
         Debug.Log($"Presenting player choices - Matching: {string.Join(",", matchingDice)}, Swappable: {string.Join(",", swappableDice)}");
         
         // Store current choices
         currentMatchingDice = new List<int>(matchingDice);
         currentSwappableDice = new List<int>(swappableDice);
         
-        // Highlight matching dice in red (destroyable)
-        foreach (int value in matchingDice)
-        {
-            opponentPos.HighlightDiceWithValue(value, Color.red, OnPlayerClickedOpponentDie);
-        }
-        
-        // Highlight swappable dice in blue (opponent's last row that can be swapped)
-        if (swappableDice.Count > 0)
-        {
-            var opponentLastRow = opponentPos.GetLastRow();
-            if (opponentLastRow != null)
-            {
-                // Check which of opponent's last row dice are ±1 from current roll
-                bool highlightA = false;
-                bool highlightB = false;
-                
-                if (opponentLastRow.diceA != null)
-                {
-                    int lastDiceA = opponentLastRow.diceA.GetLastRollValue();
-                    // Check if any of our swappable dice are ±1 from this die
-                    foreach (int swapValue in swappableDice)
-                    {
-                        if (Mathf.Abs(swapValue - lastDiceA) == 1)
-                        {
-                            highlightA = true;
-                            break;
-                        }
-                    }
-                }
-                
-                if (opponentLastRow.diceB != null)
-                {
-                    int lastDiceB = opponentLastRow.diceB.GetLastRollValue();
-                    // Check if any of our swappable dice are ±1 from this die
-                    foreach (int swapValue in swappableDice)
-                    {
-                        if (Mathf.Abs(swapValue - lastDiceB) == 1)
-                        {
-                            highlightB = true;
-                            break;
-                        }
-                    }
-                }
-                
-                opponentPos.HighlightLastRowDice(highlightA, highlightB, Color.blue, OnPlayerClickedOpponentDie);
-            }
-        }
+        // Highlight available actions using rule system
+        ruleSystem.HighlightAvailableActions(matchingDice, swappableDice, opponentPos, OnPlayerClickedOpponentDie);
         
         // Change button to "End Turn"
         isWaitingForPlayerRuleDecision = true;
@@ -701,7 +875,7 @@ public class DB_GameManager : MonoBehaviour
         }
         
         // Clear highlights
-        opponentPos.ClearAllHighlights();
+        ruleSystem.ClearHighlights(opponentPos);
         
         // Restore button text
         if (uiManager != null)
@@ -710,38 +884,9 @@ public class DB_GameManager : MonoBehaviour
         }
     }
     
-    private IEnumerator ExecuteHouseRuleDecision(List<int> matchingDice, List<int> swappableDice, ScoredDicePositioner opponentPos)
-    {
-        yield return new WaitForSeconds(0.5f);
-        
-        // House AI: Prioritize destroying dice that are high value
-        if (matchingDice.Count > 0)
-        {
-            // Destroy the highest matching die
-            int highestMatch = Mathf.Max(matchingDice.ToArray());
-            var dieToDestroy = opponentPos.FindDieByValue(highestMatch);
-            if (dieToDestroy != null)
-            {
-                Debug.Log($"House destroys player's die with value {highestMatch}");
-                opponentPos.RemoveDie(dieToDestroy);
-                if (uiManager != null)
-                    uiManager.UpdateGoalText($"House destroyed your {highestMatch}!");
-                yield return new WaitForSeconds(1f);
-            }
-        }
-        // Otherwise consider swapping if beneficial
-        else if (swappableDice.Count > 0)
-        {
-            // For now, don't implement swap (more complex logic needed)
-            Debug.Log($"House could swap but chooses not to");
-        }
-        
-        yield return new WaitForSeconds(0.3f);
-    }
-    
     private void OnPlayerClickedOpponentDie(DB_DiceController clickedDie)
     {
-        if (!isWaitingForPlayerRuleDecision || diceManager == null) return;
+        if (!isWaitingForPlayerRuleDecision || diceManager == null || ruleSystem == null) return;
         
         int dieValue = clickedDie.GetLastRollValue();
         Debug.Log($"Player clicked opponent's die with value {dieValue}");
@@ -750,69 +895,26 @@ public class DB_GameManager : MonoBehaviour
         var opponentPos = diceManager.GetHouseScoringPositioner();
         
         // Check if this die can be destroyed (matching dice rule)
-        if (currentMatchingDice.Contains(dieValue))
+        if (ruleSystem.CanDestroyDie(dieValue, currentMatchingDice))
         {
-            // Destroy the die
-            if (opponentPos != null)
-            {
-                opponentPos.RemoveDie(clickedDie);
-                if (uiManager != null)
-                    uiManager.UpdateGoalText($"Destroyed opponent's {dieValue}!");
-            }
-            
-            // End rule decision phase
+            ruleSystem.DestroyDie(clickedDie, opponentPos);
             isWaitingForPlayerRuleDecision = false;
             return;
         }
         
         // Check if this die can be swapped (±1 dice rule)
-        var playerLastRow = playerPos?.GetLastRow();
-        
-        if (playerLastRow != null && currentSwappableDice.Count > 0)
+        if (currentSwappableDice.Count > 0)
         {
-            // Find which of player's dice can swap with this opponent die
-            DB_DiceController playerDieToSwap = null;
-            
-            if (playerLastRow.diceA != null)
-            {
-                int playerDiceA = playerLastRow.diceA.GetLastRollValue();
-                if (Mathf.Abs(playerDiceA - dieValue) == 1 && currentSwappableDice.Contains(playerDiceA))
-                {
-                    playerDieToSwap = playerLastRow.diceA;
-                }
-            }
-            
-            if (playerDieToSwap == null && playerLastRow.diceB != null)
-            {
-                int playerDiceB = playerLastRow.diceB.GetLastRollValue();
-                if (Mathf.Abs(playerDiceB - dieValue) == 1 && currentSwappableDice.Contains(playerDiceB))
-                {
-                    playerDieToSwap = playerLastRow.diceB;
-                }
-            }
+            DB_DiceController playerDieToSwap = ruleSystem.FindSwappablePlayerDie(clickedDie, playerPos, currentSwappableDice);
             
             if (playerDieToSwap != null)
             {
-                // Perform the swap by flipping both dice to opposite values
-                int playerValue = playerDieToSwap.GetLastRollValue();
-                int opponentValue = clickedDie.GetLastRollValue();
-                
-                Debug.Log($"Swapping player's {playerValue} with opponent's {opponentValue}");
-                
-                // Track dice being flipped for animation completion
-                diceBeingFlipped.Clear();
-                diceBeingFlipped.Add(playerDieToSwap);
-                diceBeingFlipped.Add(clickedDie);
-                
-                playerDieToSwap.FlipToOppositeFace(opponentValue);
-                clickedDie.FlipToOppositeFace(playerValue);
+                // Perform the swap
+                ruleSystem.SwapDice(playerDieToSwap, clickedDie, diceBeingFlipped);
                 
                 // Update both score displays immediately (values already updated in dice)
                 UpdatePlayerScoreDisplay();
                 UpdateHouseScoreDisplay();
-                
-                if (uiManager != null)
-                    uiManager.UpdateGoalText($"Swapped {playerValue} for {opponentValue}!");
                 
                 // End rule decision phase
                 isWaitingForPlayerRuleDecision = false;
@@ -830,24 +932,22 @@ public class DB_GameManager : MonoBehaviour
 
     public void OnPlayerStandInAlternating()
     {
-        if (alternatingRoundManager == null) return;
-        
-        Debug.Log($"[STAND] Player stands with {alternatingRoundManager.PlayerRoundTotal}");
-        alternatingRoundManager.SetPlayerStood();
+        Debug.Log($"[STAND] Player stands with {playerRoundTotal}");
+        SetPlayerStood();
         
         // Check if house is already bust - if so, player wins immediately
-        if (alternatingRoundManager.HouseRoundTotal > 21)
+        if (houseRoundTotal > 21)
         {
-            Debug.Log($"[PLAYER WINS] House already bust ({alternatingRoundManager.HouseRoundTotal}), player stood at {alternatingRoundManager.PlayerRoundTotal}");
+            Debug.Log($"[PLAYER WINS] House already bust ({houseRoundTotal}), player stood at {playerRoundTotal}");
             playerWonCurrentRound = true;
             TransitionToState(GameState.RoundOver);
             return;
         }
         
         // Check if player is bust - if so, house wins
-        if (alternatingRoundManager.PlayerRoundTotal > 21)
+        if (playerRoundTotal > 21)
         {
-            Debug.Log($"[HOUSE WINS] Player stood while bust ({alternatingRoundManager.PlayerRoundTotal})");
+            Debug.Log($"[HOUSE WINS] Player stood while bust ({playerRoundTotal})");
             playerWonCurrentRound = false;
             TransitionToState(GameState.RoundOver);
             return;
@@ -859,30 +959,28 @@ public class DB_GameManager : MonoBehaviour
 
     public void OnHouseStandInAlternating()
     {
-        if (alternatingRoundManager == null) return;
-        
-        Debug.Log($"[STAND] House stands with {alternatingRoundManager.HouseRoundTotal}");
+        Debug.Log($"[STAND] House stands with {houseRoundTotal}");
         
         // Check for bust conditions
-        if (alternatingRoundManager.HouseRoundTotal > 21)
+        if (houseRoundTotal > 21)
         {
-            Debug.Log($"[PLAYER WINS] House stood while bust ({alternatingRoundManager.HouseRoundTotal})");
+            Debug.Log($"[PLAYER WINS] House stood while bust ({houseRoundTotal})");
             playerWonCurrentRound = true;
             TransitionToState(GameState.RoundOver);
             return;
         }
         
-        if (alternatingRoundManager.PlayerRoundTotal > 21)
+        if (playerRoundTotal > 21)
         {
-            Debug.Log($"[HOUSE WINS] Player bust ({alternatingRoundManager.PlayerRoundTotal}), house stood at {alternatingRoundManager.HouseRoundTotal}");
+            Debug.Log($"[HOUSE WINS] Player bust ({playerRoundTotal}), house stood at {houseRoundTotal}");
             playerWonCurrentRound = false;
             TransitionToState(GameState.RoundOver);
             return;
         }
         
         // Both valid - check scores to determine winner
-        int playerScore = alternatingRoundManager.PlayerRoundTotal;
-        int houseScore = alternatingRoundManager.HouseRoundTotal;
+        int playerScore = playerRoundTotal;
+        int houseScore = houseRoundTotal;
         
         if (houseScore > playerScore)
         {
@@ -905,10 +1003,8 @@ public class DB_GameManager : MonoBehaviour
 
     private IEnumerator ContinueHouseSolo()
     {
-        if (alternatingRoundManager == null) yield break;
-        
         // Safety check: if house is already bust, player wins
-        if (alternatingRoundManager.HouseRoundTotal > 21)
+        if (houseRoundTotal > 21)
         {
             Debug.Log($"[SAFETY CHECK] House already bust in ContinueHouseSolo - player wins");
             playerWonCurrentRound = true;
@@ -916,12 +1012,12 @@ public class DB_GameManager : MonoBehaviour
             yield break;
         }
         
-        Debug.Log($"[HOUSE SOLO] House continues, must beat {alternatingRoundManager.PlayerRoundTotal}");
+        Debug.Log($"[HOUSE SOLO] House continues, must beat {playerRoundTotal}");
         
         if (uiManager != null)
         {
             uiManager.DisableGameplayButtons();
-            uiManager.UpdateGoalText($"House must beat {alternatingRoundManager.PlayerRoundTotal}");
+            uiManager.UpdateGoalText($"House must beat {playerRoundTotal}");
         }
         
         yield return new WaitForSeconds(1f);
@@ -974,7 +1070,6 @@ public class DB_GameManager : MonoBehaviour
         if (player != null)
         {
             player.ResetMoney();
-            player.ClearPerks();
         }
 
         if (house != null)
@@ -998,19 +1093,7 @@ public class DB_GameManager : MonoBehaviour
 
     private IEnumerator HandleDiceRoll(System.Action<int, int> onComplete, bool isPlayerTurn)
     {
-        // Disable buttons before rolling (legacy PlayerTurn state only)
-        if (currentState == GameState.PlayerTurn && isPlayerTurn && uiManager != null)
-            uiManager.DisableGameplayButtons();
-
         yield return StartCoroutine(diceManager.RollDiceAndGetResults(onComplete, isPlayerTurn));
-
-        // Re-enable buttons after rolling (legacy PlayerTurn state only)
-        if (currentState == GameState.PlayerTurn && isPlayerTurn && uiManager != null)
-        {
-            if (player != null && player.HasRolledThisTurn())
-                uiManager.EnableStandButton();
-            uiManager.EnableRollButton();
-        }
     }
     
     #endregion
@@ -1019,8 +1102,6 @@ public class DB_GameManager : MonoBehaviour
 
     // State queries
     public GameState GetCurrentState() => currentState;
-    public bool IsPlayerTurn() => currentState == GameState.PlayerTurn;
-    public bool IsHouseTurn() => currentState == GameState.HouseTurn;
     public bool IsDiceRolling() => diceManager != null && diceManager.IsDiceRolling();
     public bool IsWaitingForPlayerRuleDecision() => isWaitingForPlayerRuleDecision;
     
@@ -1031,12 +1112,14 @@ public class DB_GameManager : MonoBehaviour
             uiManager.DisableGameplayButtons();
     }
     
-    // Alternating turn system data - delegate to round manager
-    public int GetPlayerRoundTotal() => alternatingRoundManager != null ? alternatingRoundManager.PlayerRoundTotal : 0;
-    public int GetHouseRoundTotal() => alternatingRoundManager != null ? alternatingRoundManager.HouseRoundTotal : 0;
-    public bool PlayerHasAdvantage() => alternatingRoundManager != null && alternatingRoundManager.PlayerHasAdvantage;
-    public List<DB_AlternatingRoundManager.RollRow> GetPlayerRollRows() => alternatingRoundManager != null ? alternatingRoundManager.PlayerRollRows : new List<DB_AlternatingRoundManager.RollRow>();
-    public List<DB_AlternatingRoundManager.RollRow> GetHouseRollRows() => alternatingRoundManager != null ? alternatingRoundManager.HouseRollRows : new List<DB_AlternatingRoundManager.RollRow>();
+    // Alternating turn system data - direct accessors
+    public int GetPlayerRoundTotal() => playerRoundTotal;
+    public int GetHouseRoundTotal() => houseRoundTotal;
+    public bool PlayerHasAdvantage() => playerHasAdvantage;
+    public TurnMode GetCurrentTurnMode() => currentTurnMode;
+    public bool IsPlayerTurn() => currentTurnMode == TurnMode.PlayerTurn;
+    public List<RollRow> GetPlayerRollRows() => playerRollRows;
+    public List<RollRow> GetHouseRollRows() => houseRollRows;
     
     #endregion
 }
