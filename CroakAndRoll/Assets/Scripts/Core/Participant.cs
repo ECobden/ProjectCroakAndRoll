@@ -13,6 +13,9 @@ public abstract class Participant : MonoBehaviour
     [SerializeField] protected int startingMoney = 1000;
     protected int currentMoney;
 
+    [Header("Dice Collection")]
+    [SerializeField] protected DiceBag diceBag;
+
     [Header("Manager References")]
     [SerializeField] protected DB_GameManager gameManager;
     [SerializeField] protected DB_DiceManager diceManager;
@@ -162,6 +165,14 @@ public abstract class Participant : MonoBehaviour
         canAct = can;
     }
 
+    /// <summary>
+    /// Set whether this participant's turn is active.
+    /// </summary>
+    public void SetTurnActive(bool isActive)
+    {
+        canAct = isActive;
+    }
+
     #endregion
 
     #region Money System
@@ -203,6 +214,57 @@ public abstract class Participant : MonoBehaviour
     public virtual void ResetMoney()
     {
         currentMoney = startingMoney;
+    }
+
+    #endregion
+
+    #region Dice Bag Management
+
+    /// <summary>
+    /// Get the participant's dice bag.
+    /// </summary>
+    public DiceBag GetDiceBag()
+    {
+        return diceBag;
+    }
+
+    /// <summary>
+    /// Add a die to the participant's collection.
+    /// </summary>
+    public void AddDieToBag(DieData die)
+    {
+        if (diceBag != null)
+        {
+            diceBag.AddDie(die);
+        }
+        else
+        {
+            Debug.LogWarning($"{gameObject.name} has no dice bag assigned!");
+        }
+    }
+
+    /// <summary>
+    /// Remove a die from the participant's collection.
+    /// </summary>
+    public bool RemoveDieFromBag(DieData die)
+    {
+        if (diceBag != null)
+        {
+            return diceBag.RemoveDie(die);
+        }
+        else
+        {
+            Debug.LogWarning($"{gameObject.name} has no dice bag assigned!");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Get the total number of dice in the participant's bag.
+    /// </summary>
+    public int GetDiceCount()
+    {
+        return diceBag != null ? diceBag.GetDiceCount() : 0;
     }
 
     #endregion

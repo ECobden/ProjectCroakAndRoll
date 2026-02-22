@@ -25,10 +25,21 @@ public class DB_UIManager : MonoBehaviour
     [Header("Round Total Display")]
     [SerializeField] private TextMeshProUGUI playerRoundTotalText;
     [SerializeField] private TextMeshProUGUI houseRoundTotalText;
+    
+    [Header("Round Counter Display")]
+    [SerializeField] private CanvasGroup roundCountCanvasGroup;
+    [SerializeField] private TextMeshProUGUI roundCountText;
+    [SerializeField] private float deleteSpeed = 0.05f;
+    [SerializeField] private float typeSpeed = 0.05f;
 
     #endregion
 
     #region Private Fields
+
+    private Coroutine activeRoundTextAnimation;
+    private WaitForSeconds deleteWait;
+    private WaitForSeconds typeWait;
+    private char[] textBuffer;
 
     #endregion
 
@@ -39,6 +50,13 @@ public class DB_UIManager : MonoBehaviour
         SetupButtonListeners(onRestartClicked);
         HideAllPanels();
         ClearScoreText();
+        CacheWaitForSeconds();
+    }
+
+    private void CacheWaitForSeconds()
+    {
+        deleteWait = new WaitForSeconds(deleteSpeed);
+        typeWait = new WaitForSeconds(typeSpeed);
     }
 
     private void SetupButtonListeners(Action onRestartClicked)
@@ -375,4 +393,86 @@ public class DB_UIManager : MonoBehaviour
     }
     
     #endregion
+
+    #region Round Counter Display
+
+    /// <summary>
+    /// Update the round counter display with animation.
+    /// </summary>
+    public void UpdateRoundDisplay(int roundNumber)
+    {
+        if (roundCountText == null) return;
+        
+        // Stop any existing animation to prevent overlapping
+        if (activeRoundTextAnimation != null)
+        {
+            StopCoroutine(activeRoundTextAnimation);
+        }
+        
+        activeRoundTextAnimation = StartCoroutine(AnimateRoundTextChange($"Round {roundNumber}"));
+    }
+
+    /// <summary>
+    /// Shows the round UI by setting canvas group alpha to 1.
+    /// </summary>
+    public void ShowRoundCounter()
+    {
+        if (roundCountCanvasGroup != null)
+        {
+            roundCountCanvasGroup.alpha = 1f;
+        }
+    }
+
+    /// <summary>
+    /// Hides the round UI by setting canvas group alpha to 0.
+    /// </summary>
+    public void HideRoundCounter()
+    {
+        if (roundCountCanvasGroup != null)
+        {
+            roundCountCanvasGroup.alpha = 0f;
+        }
+    }
+
+    /// <summary>
+    /// Animates the round text change by deleting old text and typing new text character by character.
+    /// Optimized to reduce garbage allocation by using char arrays instead of substring operations.
+    /// </summary>
+    private IEnumerator AnimateRoundTextChange(string newText)
+    {
+        // Delete current text character by character
+        string currentText = roundCountText.text;
+        int currentLength = currentText.Length;
+        
+        // Ensure buffer is large enough
+        int maxLength = Mathf.Max(currentLength, newText.Length);
+        if (textBuffer == null || textBuffer.Length < maxLength)
+        {
+            textBuffer = new char[maxLength];
+        }
+        
+        // Delete phase - work backwards through current text
+        for (int i = currentLength - 1; i >= 0; i--)
+        {
+            roundCountText.text = currentText.Substring(0, i);
+            yield return deleteWait;
+        }
+        
+        // Ensure text is empty
+        roundCountText.text = string.Empty;
+        
+        // Type phase - copy characters from new text to buffer
+        newText.CopyTo(0, textBuffer, 0, newText.Length);
+        
+        for (int i = 1; i <= newText.Length; i++)
+        {
+            roundCountText.text = new string(textBuffer, 0, i);
+            yield return typeWait;
+        }
+        
+        activeRoundTextAnimation = null;
+    }
+    
 }
+    
+    #endregion

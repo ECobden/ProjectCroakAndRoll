@@ -9,14 +9,8 @@ using TMPro;
 /// </summary>
 public class House : Participant
 {
-    [Header("UI Elements")]
-    [SerializeField] private TextMeshProUGUI moneyText;
-
     [Header("Roll Settings")]
     [SerializeField] private float autoRollDelay = 1f;
-
-    [Header("Money System")]
-    [SerializeField] private float winMultiplier = 1.5f;
 
     [Header("Turn State")]
     private int turnValue = 0;
@@ -29,6 +23,10 @@ public class House : Participant
     [SerializeField] [Range(0f, 1f)] private float cautiousness = 0.7f; // How risk-averse (0=reckless, 1=very cautious)
     [SerializeField] private int safeThreshold = 17; // Total at which house becomes more cautious
 
+    [Header("Stand Value")]
+    [SerializeField] private int defaultStandValue = 17; // Default value the house must stand on
+    private int currentStandValue = 17; // Current round's stand value
+
     protected override void Awake()
     {
         base.Awake();
@@ -37,7 +35,6 @@ public class House : Participant
     protected override void Start()
     {
         base.Start();
-        UpdateMoneyUI();
     }
 
     public override void OnRoundStart()
@@ -46,6 +43,7 @@ public class House : Participant
         lastRollValue = 0;
         lastDiceA = 0;
         lastDiceB = 0;
+        currentStandValue = defaultStandValue;
         
         // Reset roll progress at round start
         if (uiManager != null)
@@ -56,15 +54,21 @@ public class House : Participant
         // Target value is not used in alternating mode
         targetValue = 0;
         
-        Debug.Log($"[ROUND START] House ready - Must beat {targetValue}");
+        Debug.Log($"[ROUND START] House ready - Stand value: {currentStandValue}");
         
         if (gameManager == null)
         {
             Debug.LogError("GameManager is null in House.OnRoundStart! Cannot proceed.");
             return;
         }
-        
-        StartCoroutine(AutoRollAfterDelay());
+    }
+
+    public void BeginTurn()
+    {
+        if (!HasStood())
+        {
+            StartCoroutine(AutoRollAfterDelay());
+        }
     }
 
     private IEnumerator AutoRollAfterDelay()
@@ -84,11 +88,11 @@ public class House : Participant
         }
         
         // Silently skip if dice are already rolling - this is normal during overlapping coroutines
-        if (gameManager.IsDiceRolling())
+        if (diceManager != null && diceManager.IsDiceRolling())
             return;
         
-        // In alternating mode, use AI to decide whether to roll or stand
-        if (gameManager.GetCurrentState() == DB_GameManager.GameState.AlternatingTurns)
+        // use AI to decide whether to roll or stand
+        if (gameManager.GetCurrentState() == DB_GameManager.GameState.PlayRound)
         {
             if (ShouldHouseStand())
             {
@@ -100,8 +104,8 @@ public class House : Participant
             Debug.Log($"[HOUSE AI] Deciding to ROLL (current: {GetTurnValue()}, target: {GetPlayerScore()})");
         }
         
-        Debug.Log("House calling RollSharedDice");
-        gameManager.RollSharedDice(OnDiceRolled, false); // false = house turn
+        Debug.Log("House calling diceManager.RollDiceAndGetResults");
+        StartCoroutine(diceManager.RollDiceAndGetResults(OnDiceRolled, false)); // false = house turn
     }
 
     private void OnDiceRolled(int diceAValue, int diceBValue)
@@ -113,8 +117,9 @@ public class House : Participant
         // Handle roll through game manager for alternating mode
         if (gameManager != null)
         {
-            gameManager.OnAlternatingRoll(diceAValue, diceBValue, false);
+
             RecordRoll(diceAValue, diceBValue);
+            gameManager.OnParticipantRolled(false, diceAValue, diceBValue);
         }
     }
 
@@ -123,62 +128,29 @@ public class House : Participant
         return turnValue;
     }
 
-    private void UpdateMoneyUI()
-    {
-        if (moneyText != null)
-        {
-            moneyText.text = $"${currentMoney}";
-        }
-    }
-
-    public new int GetCurrentMoney()
-    {
-        return currentMoney;
-    }
-
-    public int ReceiveBet(int betAmount)
-    {
-        currentMoney += betAmount;
-        UpdateMoneyUI();
-        Debug.Log($"House received bet of {betAmount}. Total money: {currentMoney}");
-        return currentMoney;
-    }
-
-    public int PayWinnings(int betAmount)
-    {
-        // Total payout is bet + winnings
-        int winnings = Mathf.RoundToInt(betAmount * winMultiplier);
-        int totalPayout = betAmount + winnings;
-        
-        // Check if house has enough money
-        if (currentMoney < totalPayout)
-        {
-            totalPayout = currentMoney;
-            currentMoney = 0;
-            Debug.Log($"House paying all remaining money: {totalPayout}");
-        }
-        else
-        {
-            currentMoney -= totalPayout;
-            Debug.Log($"House paying {totalPayout} (bet {betAmount} + winnings {winnings}). Remaining: {currentMoney}");
-        }
-        
-        UpdateMoneyUI();
-        return totalPayout;
-    }
-
-    public override void ResetMoney()
-    {
-        base.ResetMoney();
-        UpdateMoneyUI();
-    }
-
     public void ResetTurnValue()
     {
         turnValue = 0;
         lastRollValue = 0;
         lastDiceA = 0;
         lastDiceB = 0;
+    }
+
+    /// <summary>
+    /// Set the stand value for this round. This is the threshold at which the house must stand.
+    /// </summary>
+    public void SetStandValue(int newStandValue)
+    {
+        currentStandValue = newStandValue;
+        Debug.Log($"[HOUSE] Stand value set to {currentStandValue}");
+    }
+
+    /// <summary>
+    /// Get the current stand value.
+    /// </summary>
+    public int GetStandValue()
+    {
+        return currentStandValue;
     }
     
     #region AI Decision Making
@@ -195,6 +167,13 @@ public class House : Participant
         
         // Always roll if we have nothing
         if (houseTotal == 0) return false;
+
+        // Mandatory stand at stand value threshold
+        if (houseTotal >= currentStandValue)
+        {
+            Debug.Log($"[HOUSE AI] Reached stand value threshold ({houseTotal} >= {currentStandValue}) - MUST STAND");
+            return true;
+        }
         
         // Already won - stand
         if (houseTotal >= playerTotal && houseTotal <= 21)
@@ -325,14 +304,6 @@ public class House : Participant
     {
         Debug.Log($"[HOUSE STAND] House stands with {GetTurnValue()}");
         SetHasStood(true);
-        
-        if (gameManager != null)
-        {
-            // In alternating mode, notify game manager to check scores and determine winner
-            if (gameManager.GetCurrentState() == DB_GameManager.GameState.AlternatingTurns)
-            {
-                gameManager.OnHouseStandInAlternating();
-            }
-        }
+        gameManager.OnParticipantStood(false);
     }
 }

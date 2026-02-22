@@ -12,12 +12,7 @@ public class DB_DiceManager : MonoBehaviour
     [SerializeField] private DB_DiceTargetArea diceTargetArea;
 
     [Header("Position References")]
-    [SerializeField] private Transform diceIdlePositionA;
-    [SerializeField] private Transform diceIdlePositionB;
-    [SerializeField] private Transform playerLaunchPositionA;
-    [SerializeField] private Transform playerLaunchPositionB;
-    [SerializeField] private Transform houseLaunchPositionA;
-    [SerializeField] private Transform houseLaunchPositionB;
+    [SerializeField] private List<Transform> launchPositions = new List<Transform>();
     
     [Header("Scoring Positions")]
     [SerializeField] private ScoredDicePositioner playerScoringPositioner; // Player scored dice manager
@@ -41,7 +36,7 @@ public class DB_DiceManager : MonoBehaviour
 
     #region Initialization
 
-    private void SpawnSharedDice()
+    private void SpawnSharedDice(Vector3 spawnPosition)
     {
         if (dicePrefab == null)
         {
@@ -51,31 +46,31 @@ public class DB_DiceManager : MonoBehaviour
 
         if (diceControllerA == null)
         {
-            GameObject diceInstanceA = Instantiate(dicePrefab, GetIdlePosition(diceIdlePositionA), Quaternion.identity, diceParent);
+            GameObject diceInstanceA = Instantiate(dicePrefab, spawnPosition, Quaternion.identity, diceParent);
             diceControllerA = diceInstanceA.GetComponent<DB_DiceController>();
             Debug.Log("Spawned new dice A");
         }
 
         if (diceControllerB == null)
         {
-            GameObject diceInstanceB = Instantiate(dicePrefab, GetIdlePosition(diceIdlePositionB), Quaternion.identity, diceParent);
+            GameObject diceInstanceB = Instantiate(dicePrefab, spawnPosition, Quaternion.identity, diceParent);
             diceControllerB = diceInstanceB.GetComponent<DB_DiceController>();
             Debug.Log("Spawned new dice B");
         }
     }
 
-    private void InitializeSharedDice()
+    private void InitializeSharedDice(Vector3 launchPosition)
     {
         if (diceControllerA != null)
         {
-            diceControllerA.Initialize(GetIdlePosition(diceIdlePositionA));
+            diceControllerA.Initialize(launchPosition);
             if (diceTargetArea != null)
                 diceControllerA.SetTargetArea(diceTargetArea);
         }
 
         if (diceControllerB != null)
         {
-            diceControllerB.Initialize(GetIdlePosition(diceIdlePositionB));
+            diceControllerB.Initialize(launchPosition);
             if (diceTargetArea != null)
                 diceControllerB.SetTargetArea(diceTargetArea);
         }
@@ -92,10 +87,23 @@ public class DB_DiceManager : MonoBehaviour
         // This method kept for compatibility but does nothing
         Debug.Log("RefreshDiceIdlePositions called (no-op in new system)");
     }
-
-    private Vector3 GetIdlePosition(Transform target)
+    
+    /// <summary>
+    /// Get a random launch position from the list
+    /// </summary>
+    private Vector3 GetRandomLaunchPosition()
     {
-        return target != null ? target.position : Vector3.zero;
+        if (launchPositions == null || launchPositions.Count == 0)
+        {
+            Debug.LogWarning("No launch positions set!");
+            return Vector3.zero;
+        }
+        
+        // Select a random position from the list
+        int randomIndex = Random.Range(0, launchPositions.Count);
+        Transform selectedPosition = launchPositions[randomIndex];
+        
+        return selectedPosition != null ? selectedPosition.position : Vector3.zero;
     }
 
     #endregion
@@ -112,20 +120,19 @@ public class DB_DiceManager : MonoBehaviour
 
         isDiceRolling = true;
         
-        // Spawn fresh dice for this roll
-        SpawnSharedDice();
-        InitializeSharedDice();
+        // Get random launch position (same for both dice)
+        Vector3 launchPos = GetRandomLaunchPosition();
+        
+        // Spawn fresh dice at launch position
+        SpawnSharedDice(launchPos);
+        InitializeSharedDice(launchPos);
 
-        // Get appropriate launch positions based on turn
-        Vector3 launchPosA = isPlayerTurn ? GetIdlePosition(playerLaunchPositionA) : GetIdlePosition(houseLaunchPositionA);
-        Vector3 launchPosB = isPlayerTurn ? GetIdlePosition(playerLaunchPositionB) : GetIdlePosition(houseLaunchPositionB);
-
-        // Tell dice to roll from launch positions
+        // Tell dice to roll from the launch position
         if (diceControllerA != null)
-            diceControllerA.RollFromLaunchPosition(launchPosA);
+            diceControllerA.RollFromLaunchPosition(launchPos);
 
         if (diceControllerB != null)
-            diceControllerB.RollFromLaunchPosition(launchPosB);
+            diceControllerB.RollFromLaunchPosition(launchPos);
 
         // Wait for both dice to finish rolling
         while ((diceControllerA != null && diceControllerA.IsRolling()) ||

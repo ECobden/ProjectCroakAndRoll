@@ -37,9 +37,9 @@ public class Player : Participant
 
     public override void RollDice()
     {
-        if (!canAct || gameManager == null || gameManager.IsDiceRolling()) return;
+        if (!canAct || diceManager == null || diceManager.IsDiceRolling()) return;
         
-        gameManager.RollSharedDice(OnDiceRolled, true); // true = player turn
+        StartCoroutine(diceManager.RollDiceAndGetResults(OnDiceRolled, true)); // true = player turn
     }
 
     private void OnDiceRolled(int diceAValue, int diceBValue)
@@ -47,9 +47,10 @@ public class Player : Participant
         // Handle roll through game manager for alternating mode
         if (gameManager != null)
         {
-            gameManager.OnAlternatingRoll(diceAValue, diceBValue, true);
+            
             hasRolledThisTurn = true;
             RecordRoll(diceAValue, diceBValue);
+            gameManager.OnParticipantRolled(true, diceAValue, diceBValue);
         }
     }
 
@@ -101,11 +102,8 @@ public class Player : Participant
         }
 
         SetHasStood(true);
+        gameManager.OnParticipantStood(true);
         
-        if (gameManager != null)
-        {
-            gameManager.OnPlayerStandInAlternating();
-        }
     }
 
     private void UpdateMoneyUI()

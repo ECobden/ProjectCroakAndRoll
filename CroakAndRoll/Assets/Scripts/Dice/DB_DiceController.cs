@@ -592,12 +592,12 @@ public class DB_DiceController : MonoBehaviour
     {
         // Standard dice orientation: Face 2 points up (local Y+) when dice is at identity rotation
         // Face layout:
-        // - Local Y+ (up) = face 2
-        // - Local Y- (down) = face 5
-        // - Local X+ (right) = face 1
-        // - Local X- (left) = face 6
-        // - Local Z+ (forward) = face 3
-        // - Local Z- (back) = face 4
+        // - Local Y+ (up) = face 1
+        // - Local Y- (down) = face 6
+        // - Local X+ (right) = face 4
+        // - Local X- (left) = face 3
+        // - Local Z+ (forward) = face 5
+        // - Local Z- (back) = face 2
         
         // Get the six local axes in world space
         Vector3 localUp = transform.up;        // Local Y+
@@ -622,12 +622,12 @@ public class DB_DiceController : MonoBehaviour
         float maxDot = Mathf.Max(dotUp, dotDown, dotRight, dotLeft, dotForward, dotBack);
         
         // Return the corresponding face value
-        if (maxDot == dotUp) return 2;
-        if (maxDot == dotDown) return 5;
-        if (maxDot == dotRight) return 1;
-        if (maxDot == dotLeft) return 6;
-        if (maxDot == dotForward) return 3;
-        if (maxDot == dotBack) return 4;
+        if (maxDot == dotUp) return 1;
+        if (maxDot == dotDown) return 6;
+        if (maxDot == dotRight) return 4;
+        if (maxDot == dotLeft) return 3;
+        if (maxDot == dotForward) return 5;
+        if (maxDot == dotBack) return 2;
         
         // Fallback (should never reach here)
         Debug.LogWarning("[DB_DiceController] Could not determine face value from rotation.");
