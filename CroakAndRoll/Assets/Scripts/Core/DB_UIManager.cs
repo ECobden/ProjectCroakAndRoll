@@ -89,79 +89,6 @@ public class DB_UIManager : MonoBehaviour
         if (buttonPanel != null)
             buttonPanel.SetActive(false);
     }
-
-    #endregion
-
-    #region Betting UI
-
-    public void ShowBetSelection(int smallBetAmount, int largeBetAmount, Action onSmallBetSelected, Action onLargeBetSelected)
-    {
-        // Position turn marker to player
-        if (turnMarker != null)
-            turnMarker.SetPlayerTurnPosition();
-
-        // Show button panel first
-        ShowButtonPanel();
-
-        // Update button texts for betting
-        if (buttonLeft != null)
-            buttonLeft.SetButtonText("Small Bet\n$" + smallBetAmount);
-        if (buttonRight != null)
-            buttonRight.SetButtonText("Large Bet\n$" + largeBetAmount);
-
-        // Set button actions for betting
-        if (buttonLeft != null)
-            buttonLeft.SetButtonAction(onSmallBetSelected);
-        if (buttonRight != null)
-            buttonRight.SetButtonAction(onLargeBetSelected);
-
-        // Activate buttons
-        if (buttonLeft != null)
-            buttonLeft.ActivateButton();
-        if (buttonRight != null)
-            buttonRight.ActivateButton();
-
-        // Ensure buttons are enabled (in case they were already active from previous round)
-        if (buttonLeft != null)
-            buttonLeft.EnableButton();
-        if (buttonRight != null)
-            buttonRight.EnableButton();
-    }
-
-    public IEnumerator SwitchToGameplayButtons(Action onStandAction, Action onRollAction)
-    {
-        // Deactivate buttons
-        if (buttonLeft != null)
-            buttonLeft.DeactivateButton();
-        if (buttonRight != null)
-            buttonRight.DeactivateButton();
-
-        // Wait a bit for deactivation animation
-        yield return new WaitForSeconds(0.6f);
-
-        // Update button texts
-        if (buttonLeft != null)
-            buttonLeft.SetButtonText("Stand");
-        if (buttonRight != null)
-            buttonRight.SetButtonText("Roll");
-
-        // Set new button actions for gameplay
-        if (buttonLeft != null)
-            buttonLeft.SetButtonAction(onStandAction);
-        if (buttonRight != null)
-            buttonRight.SetButtonAction(onRollAction);
-
-        // Activate buttons
-        if (buttonLeft != null)
-            buttonLeft.ActivateButton();
-        if (buttonRight != null)
-            buttonRight.ActivateButton();
-
-        // Stand button should start disabled (player hasn't rolled yet)
-        yield return new WaitForSeconds(0.1f); // Wait for activation animation
-        if (buttonLeft != null)
-            buttonLeft.DisableButton();
-    }
     
     public IEnumerator ShowGameplayButtonsDirectly(Action onStandAction, Action onRollAction)
     {
@@ -387,9 +314,9 @@ public class DB_UIManager : MonoBehaviour
     public void ClearRoundTotals()
     {
         if (playerRoundTotalText != null)
-            playerRoundTotalText.text = "0";
+            playerRoundTotalText.text = " ";
         if (houseRoundTotalText != null)
-            houseRoundTotalText.text = "0";
+            houseRoundTotalText.text = " ";
     }
     
     #endregion

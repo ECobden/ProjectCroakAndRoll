@@ -412,7 +412,7 @@ public class DB_DiceController : MonoBehaviour
         // Determine final value
         int faceValue = GetDiceFaceValue();
         lastRollValue = faceValue;
-        Debug.Log($"Dice rolled: {faceValue}");
+        //Debug.Log($"Dice rolled: {faceValue}");
 
         // DON'T move back to idle position - dice will be moved to scoring position by DiceManager
         // The dice should stay in its settled position to preserve the correct face orientation
@@ -596,8 +596,8 @@ public class DB_DiceController : MonoBehaviour
         // - Local Y- (down) = face 6
         // - Local X+ (right) = face 4
         // - Local X- (left) = face 3
-        // - Local Z+ (forward) = face 5
-        // - Local Z- (back) = face 2
+        // - Local Z+ (forward) = face 2
+        // - Local Z- (back) = face 5
         
         // Get the six local axes in world space
         Vector3 localUp = transform.up;        // Local Y+
@@ -626,8 +626,8 @@ public class DB_DiceController : MonoBehaviour
         if (maxDot == dotDown) return 6;
         if (maxDot == dotRight) return 4;
         if (maxDot == dotLeft) return 3;
-        if (maxDot == dotForward) return 5;
-        if (maxDot == dotBack) return 2;
+        if (maxDot == dotForward) return 2;
+        if (maxDot == dotBack) return 5;
         
         // Fallback (should never reach here)
         Debug.LogWarning("[DB_DiceController] Could not determine face value from rotation.");
