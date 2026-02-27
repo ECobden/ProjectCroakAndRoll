@@ -163,8 +163,10 @@ public class DB_GameManager : MonoBehaviour
         var playerPos = diceManager.GetPlayerScoringPositioner();
         if (playerPos != null)
         {
-            uiManager.UpdatePlayerRoundTotal(playerRoundTotal);
-            Debug.Log($"Player score updated: {playerRoundTotal}");
+            int actualTotal = playerPos.GetTotalScore();
+            playerRoundTotal = actualTotal; // Sync cached value with actual
+            uiManager.UpdatePlayerRoundTotal(actualTotal);
+            Debug.Log($"Player score updated: {actualTotal}");
         }
     }
     
@@ -178,8 +180,10 @@ public class DB_GameManager : MonoBehaviour
         var housePos = diceManager.GetHouseScoringPositioner();
         if (housePos != null)
         {
-            uiManager.UpdateHouseRoundTotal(houseRoundTotal);
-            Debug.Log($"House score updated: {houseRoundTotal}");
+            int actualTotal = housePos.GetTotalScore();
+            houseRoundTotal = actualTotal; // Sync cached value with actual
+            uiManager.UpdateHouseRoundTotal(actualTotal);
+            Debug.Log($"House score updated: {actualTotal}");
         }
     }
     
@@ -301,7 +305,7 @@ public class DB_GameManager : MonoBehaviour
             player.AddMoney(baseRoundWinReward);
         
         if (uiManager != null)
-            uiManager.ClearScoreText();
+            uiManager.ClearRollScoreText();
         
         TransitionToState(GameState.RoundOver);
     }
@@ -388,7 +392,7 @@ public class DB_GameManager : MonoBehaviour
         
         // Clear all UI from previous round
         uiManager.ClearRoundTotals();
-        uiManager.ClearScoreText();
+        uiManager.ClearRollScoreText();
         uiManager.HideStandValue();
         uiManager.ResetGoalRollProgress();
     }
@@ -585,7 +589,7 @@ public class DB_GameManager : MonoBehaviour
         roundWasTie = true;
 
         if (uiManager != null)
-            uiManager.ClearScoreText();
+            uiManager.ClearRollScoreText();
 
         TransitionToState(GameState.RoundOver);
     }
@@ -654,22 +658,18 @@ public class DB_GameManager : MonoBehaviour
 
         if (isPlayer)
         {
-            playerRoundTotal += rollTotal;
+            // Don't add to playerRoundTotal here - it's handled by UpdatePlayerScoreDisplay via callback
             playerRollRows.Add(new RollRow(diceAValue, diceBValue));
 
             if (uiManager != null)
             {
-                uiManager.UpdatePlayerRoundTotal(playerRoundTotal);
                 uiManager.EnableStandButton();
             }
         }
         else
         {
-            houseRoundTotal += rollTotal;
+            // Don't add to houseRoundTotal here - it's handled by UpdateHouseScoreDisplay via callback
             houseRollRows.Add(new RollRow(diceAValue, diceBValue));
-
-            if (uiManager != null)
-                uiManager.UpdateHouseRoundTotal(houseRoundTotal);
         }
 
         if (CheckImmediateWinOrBust(isPlayer))

@@ -412,7 +412,7 @@ public class DB_DiceController : MonoBehaviour
         // Determine final value
         int faceValue = GetDiceFaceValue();
         lastRollValue = faceValue;
-        //Debug.Log($"Dice rolled: {faceValue}");
+        Debug.Log($"[DiceController] {gameObject.name} rolled: {faceValue}, isRolling will be set to false next");
 
         // DON'T move back to idle position - dice will be moved to scoring position by DiceManager
         // The dice should stay in its settled position to preserve the correct face orientation
@@ -426,12 +426,14 @@ public class DB_DiceController : MonoBehaviour
     {
         if (rb == null) return;
 
-        // Reset velocities and enable physics
+        // Enable physics first (must be non-kinematic before setting velocities)
+        rb.isKinematic = false;
+        rb.useGravity = true;
+        rb.WakeUp();
+        
+        // Reset velocities
         rb.linearVelocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
-        rb.useGravity = true;
-        rb.isKinematic = false;
-        rb.WakeUp();
 
         // Play roll sound
         PlayRollSound();

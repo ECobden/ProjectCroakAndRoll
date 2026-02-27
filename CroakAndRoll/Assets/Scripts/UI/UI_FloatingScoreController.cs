@@ -9,7 +9,6 @@ public class UI_FloatingScoreController : MonoBehaviour
 
     [Header("Score Display")]
     [SerializeField] private TextMeshProUGUI scoreText;
-    [SerializeField] private UI_GoalTextController goalTextController;
     [SerializeField] private RectTransform scoreVisualElement;
 
     [Header("Animation Settings")]
@@ -74,23 +73,28 @@ public class UI_FloatingScoreController : MonoBehaviour
         return scoreTransferCoroutine != null;
     }
 
-    public void UpdateScore(int turnTotal, bool isPlayerTurn)
+    public void UpdateScore(int targetScore)
     {
-        // Detect turn switch: if turnTotal is less than currentTurnTotal, we've started a new turn
-        if (turnTotal < currentTurnTotal)
+        // Stop any existing animation
+        if (scoreTransferCoroutine != null)
         {
-            currentTurnTotal = 0;
+            StopCoroutine(scoreTransferCoroutine);
         }
-        
-        // Calculate the roll value (difference from previous total)
-        int rollValue = turnTotal - currentTurnTotal;
-        currentTurnTotal = turnTotal;
 
+        // Start count-up animation
+        scoreTransferCoroutine = StartCoroutine(CountUpAnimation(targetScore));
+    }
+
+    #endregion
+
+    #region Animation
+
+    private IEnumerator CountUpAnimation(int targetScore)
+    {
+        // Show the roll value with punch animation
         if (scoreText != null)
         {
-            scoreText.text = rollValue.ToString();
-
-            // Punch animation
+            scoreText.text = targetScore.ToString();
             scoreText.transform.DOKill();
             scoreText.transform.localScale = Vector3.one;
             scoreText.transform.DOPunchScale(Vector3.one * (scorePunchScale - 1f), scorePunchDuration, 5, 0.5f);
@@ -100,66 +104,28 @@ public class UI_FloatingScoreController : MonoBehaviour
         if (scoreVisualElement != null)
         {
             scoreVisualElement.DOKill();
-            
-            // Scale up to target scale with punch
             scoreVisualElement.localScale = Vector3.zero;
             scoreVisualElement.DOScale(visualElementTargetScale, visualElementScaleDuration)
                 .SetEase(Ease.OutBack)
                 .SetDelay(visualElementTimeOffset);
             scoreVisualElement.DOPunchScale(Vector3.one * visualElementPunchScale, scorePunchDuration, 5, 0.5f)
                 .SetDelay(visualElementScaleDuration + visualElementTimeOffset);
-            
-            // Rotate to target rotation
             scoreVisualElement.localRotation = Quaternion.identity;
             scoreVisualElement.DOLocalRotate(new Vector3(0, 0, visualElementRotation), visualElementScaleDuration + scorePunchDuration)
                 .SetEase(Ease.OutCubic)
                 .SetDelay(visualElementTimeOffset);
         }
 
-        // Stop any existing transfer animation
-        if (scoreTransferCoroutine != null)
-        {
-            StopCoroutine(scoreTransferCoroutine);
-        }
-
-        // Start score transfer animation
-        scoreTransferCoroutine = StartCoroutine(TransferScoreAnimation(rollValue, turnTotal, isPlayerTurn));
-    }
-
-    #endregion
-
-    #region Animation
-
-    private IEnumerator TransferScoreAnimation(int rollValue, int turnTotal, bool isPlayerTurn)
-    {
-        // Wait for punch animation to finish plus delay
+        // Wait for punch animation
         yield return new WaitForSeconds(scorePunchDuration + scoreTransferDelay);
-
-        // Get starting value for goal text animation (previous total)
-        int startingTotal = turnTotal - rollValue;
-
-        // Simultaneously count down score text (roll value) and count up goal text (turn total)
-        for (int i = 0; i <= rollValue; i++)
+        
+        // Clear score text
+        if (scoreText != null)
         {
-            int remainingRoll = rollValue - i;
-            int currentTotal = startingTotal + i;
-
-            // Update score text (counting down the roll value)
-            if (scoreText != null)
-            {
-                scoreText.text = remainingRoll > 0 ? remainingRoll.ToString() : "";
-            }
-
-            // Update goal text (counting up the turn total)
-            if (goalTextController != null)
-            {
-                goalTextController.SetRollProgressImmediate(currentTotal, isPlayerTurn);
-            }
-
-            yield return new WaitForSeconds(scoreTransferSpeed);
+            scoreText.text = "";
         }
         
-        // Scale down visual element when score reaches zero
+        // Scale down visual element
         if (scoreVisualElement != null)
         {
             scoreVisualElement.DOScale(0f, visualElementScaleDuration)

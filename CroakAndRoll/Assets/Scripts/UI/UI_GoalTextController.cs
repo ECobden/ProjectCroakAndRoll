@@ -63,18 +63,16 @@ public class UI_GoalTextController : MonoBehaviour
     /// Sets the roll progress value immediately without animation.
     /// Use this when coordinating with other animations like the floating score.
     /// </summary>
-    public void SetRollProgressImmediate(int value, bool isPlayerTurn)
+    public void SetRollProgressImmediate(int value)
     {
         if (goalText == null) return;
 
-        this.isPlayerTurn = isPlayerTurn;
         currentRollValue = value;
 
         // Cancel any ongoing animation
         StopCurrentAnimation();
 
-        string playerName = isPlayerTurn ? "Player" : "House";
-        goalText.text = $"{playerName}: {value} / {MAX_ROLL_VALUE}";
+        goalText.text = $"{value} / {MAX_ROLL_VALUE}";
     }
 
     /// <summary>

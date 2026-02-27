@@ -2169,7 +2169,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   scoreText: {fileID: 295696604}
-  goalTextController: {fileID: 1289437249}
   scoreVisualElement: {fileID: 179501526}
   scorePunchScale: 1.3
   scorePunchDuration: 0.3
@@ -14062,6 +14061,7 @@ MonoBehaviour:
   houseScoringPositioner: {fileID: 96483475}
   uiManager: {fileID: 85049699}
   delayBeforeMovingToScoring: 0.5
+  diceSpawnXOffset: 0.025
 --- !u!4 &1216481609
 Transform:
   m_ObjectHideFlags: 0

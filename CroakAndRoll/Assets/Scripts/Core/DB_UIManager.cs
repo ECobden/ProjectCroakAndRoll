@@ -49,7 +49,7 @@ public class DB_UIManager : MonoBehaviour
     {
         SetupButtonListeners(onRestartClicked);
         HideAllPanels();
-        ClearScoreText();
+        ClearRollScoreText();
         CacheWaitForSeconds();
     }
 
@@ -211,16 +211,16 @@ public class DB_UIManager : MonoBehaviour
             goalTextController.ResetRollProgress();
     }
 
-    public void ClearScoreText()
+    public void ClearRollScoreText()
     {
         if (floatingScoreController != null)
             floatingScoreController.ClearScore();
     }
 
-    public void UpdateScoreText(int turnTotal, bool isPlayerTurn)
+    public void UpdateRollScoreText(int rollTotal)
     {
         if (floatingScoreController != null)
-            floatingScoreController.UpdateScore(turnTotal, isPlayerTurn);
+            floatingScoreController.UpdateScore(rollTotal);
     }
 
     public void ShowStandValue(string value)

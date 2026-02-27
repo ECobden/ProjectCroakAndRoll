@@ -23,6 +23,9 @@ public class DB_DiceManager : MonoBehaviour
     
     [Header("Timing Settings")]
     [SerializeField] private float delayBeforeMovingToScoring = 0.5f; // Delay after dice settle before moving to scoring position
+    
+    [Header("Dice Spawn Offset")]
+    [SerializeField] private float diceSpawnXOffset = 15.5f; // Horizontal offset to prevent dice spawning inside each other
 
     #endregion
 
@@ -46,14 +49,14 @@ public class DB_DiceManager : MonoBehaviour
 
         if (diceControllerA == null)
         {
-            GameObject diceInstanceA = Instantiate(dicePrefab, spawnPosition, Quaternion.identity, diceParent);
+            GameObject diceInstanceA = Instantiate(dicePrefab, spawnPosition + Vector3.left * diceSpawnXOffset, Quaternion.identity, diceParent);
             diceControllerA = diceInstanceA.GetComponent<DB_DiceController>();
             Debug.Log("Spawned new dice A");
         }
 
         if (diceControllerB == null)
         {
-            GameObject diceInstanceB = Instantiate(dicePrefab, spawnPosition, Quaternion.identity, diceParent);
+            GameObject diceInstanceB = Instantiate(dicePrefab, spawnPosition + Vector3.right * diceSpawnXOffset, Quaternion.identity, diceParent);
             diceControllerB = diceInstanceB.GetComponent<DB_DiceController>();
             Debug.Log("Spawned new dice B");
         }
@@ -63,14 +66,16 @@ public class DB_DiceManager : MonoBehaviour
     {
         if (diceControllerA != null)
         {
-            diceControllerA.Initialize(launchPosition);
+            Vector3 offsetPosA = launchPosition + Vector3.left * diceSpawnXOffset;
+            diceControllerA.Initialize(offsetPosA);
             if (diceTargetArea != null)
                 diceControllerA.SetTargetArea(diceTargetArea);
         }
 
         if (diceControllerB != null)
         {
-            diceControllerB.Initialize(launchPosition);
+            Vector3 offsetPosB = launchPosition + Vector3.right * diceSpawnXOffset;
+            diceControllerB.Initialize(offsetPosB);
             if (diceTargetArea != null)
                 diceControllerB.SetTargetArea(diceTargetArea);
         }
@@ -79,15 +84,6 @@ public class DB_DiceManager : MonoBehaviour
     #endregion
 
     #region Position Management
-
-    public void RefreshDiceIdlePositions()
-    {
-        // Legacy method - no longer moves dice back to idle
-        // Dice are now instantiated fresh for each roll
-        // This method kept for compatibility but does nothing
-        Debug.Log("RefreshDiceIdlePositions called (no-op in new system)");
-    }
-    
     /// <summary>
     /// Get a random launch position from the list
     /// </summary>
@@ -110,7 +106,18 @@ public class DB_DiceManager : MonoBehaviour
 
     #region Dice Rolling
 
+    /// <summary>
+    /// Roll dice and handle all results (scoring, positioning, callbacks)
+    /// </summary>
     public IEnumerator RollDiceAndGetResults(System.Action<int, int> onComplete, bool isPlayerTurn)
+    {
+        yield return StartCoroutine(RollDiceCoroutine(onComplete, isPlayerTurn));
+    }
+
+    /// <summary>
+    /// Orchestrates the rolling and result handling phases
+    /// </summary>
+    private IEnumerator RollDiceCoroutine(System.Action<int, int> onComplete, bool isPlayerTurn)
     {
         if (isDiceRolling)
         {
@@ -120,19 +127,40 @@ public class DB_DiceManager : MonoBehaviour
 
         isDiceRolling = true;
         
-        // Get random launch position (same for both dice)
+        // Phase 1: Roll the dice
         Vector3 launchPos = GetRandomLaunchPosition();
+        yield return StartCoroutine(PerformDiceRoll(launchPos));
         
+        // Get dice values after rolling
+        int diceAValue = diceControllerA != null ? diceControllerA.GetLastRollValue() : 0;
+        int diceBValue = diceControllerB != null ? diceControllerB.GetLastRollValue() : 0;
+        
+        Debug.Log($"[DiceManager] Dice values after roll: A={diceAValue}, B={diceBValue}, Total={diceAValue + diceBValue}");
+        
+        // Phase 2: Handle results and scoring
+        yield return StartCoroutine(ProcessDiceResults(diceAValue, diceBValue, onComplete, isPlayerTurn));
+        
+        isDiceRolling = false;
+    }
+
+    /// <summary>
+    /// Phase 1: Spawn, initialize, and roll the dice
+    /// </summary>
+    private IEnumerator PerformDiceRoll(Vector3 launchPos)
+    {
         // Spawn fresh dice at launch position
         SpawnSharedDice(launchPos);
         InitializeSharedDice(launchPos);
 
-        // Tell dice to roll from the launch position
+        // Tell dice to roll from their offset positions
         if (diceControllerA != null)
-            diceControllerA.RollFromLaunchPosition(launchPos);
+            diceControllerA.RollFromLaunchPosition(launchPos + Vector3.left * diceSpawnXOffset);
 
         if (diceControllerB != null)
-            diceControllerB.RollFromLaunchPosition(launchPos);
+            diceControllerB.RollFromLaunchPosition(launchPos + Vector3.right * diceSpawnXOffset);
+
+        // Wait one frame to ensure roll coroutines have started
+        yield return null;
 
         // Wait for both dice to finish rolling
         while ((diceControllerA != null && diceControllerA.IsRolling()) ||
@@ -140,10 +168,16 @@ public class DB_DiceManager : MonoBehaviour
         {
             yield return null;
         }
+        
+        // Wait one more frame to ensure values are fully set after IsRolling becomes false
+        yield return null;
+    }
 
-        // Get dice values
-        int diceAValue = diceControllerA != null ? diceControllerA.GetLastRollValue() : 0;
-        int diceBValue = diceControllerB != null ? diceControllerB.GetLastRollValue() : 0;
+    /// <summary>
+    /// Phase 2: Show UI, move to scoring position, and invoke callback
+    /// </summary>
+    private IEnumerator ProcessDiceResults(int diceAValue, int diceBValue, System.Action<int, int> onComplete, bool isPlayerTurn)
+    {
 
         // Show floating score UI immediately after dice stop rolling
         if (uiManager != null)
@@ -151,10 +185,14 @@ public class DB_DiceManager : MonoBehaviour
             // Get current total before adding new dice
             ScoredDicePositioner currentPositioner = isPlayerTurn ? playerScoringPositioner : houseScoringPositioner;
             int currentTotal = currentPositioner != null ? currentPositioner.GetTotalScore() : 0;
-            int projectedTotal = currentTotal + diceAValue + diceBValue;
+            int rollTotal = diceAValue + diceBValue;
+            Debug.Log($"[DiceManager] Sending rollTotal={rollTotal}");
+
+            int projectedTotal = currentTotal + rollTotal;
+            
             
             // Trigger floating score animation
-            uiManager.UpdateScoreText(projectedTotal, isPlayerTurn);
+            uiManager.UpdateRollScoreText(rollTotal);
         }
 
         // Wait a short delay before moving to scoring position
@@ -170,8 +208,6 @@ public class DB_DiceManager : MonoBehaviour
         
         // Move dice to scoring position and wait for movement to complete
         yield return StartCoroutine(MoveDiceToScoringPositionCoroutine(currentDiceA, currentDiceB, isPlayerTurn));
-        
-        isDiceRolling = false;
 
         // Return results via callback - only after dice are in position
         onComplete?.Invoke(diceAValue, diceBValue);
