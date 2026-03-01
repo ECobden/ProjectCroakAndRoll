@@ -124,6 +124,28 @@ public class DB_DiceController : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Lerp the dice to a specified position.
+    /// Useful for displaying dice in the dice bag grid.
+    /// </summary>
+    public void LerpToPosition(Vector3 targetPosition)
+    {
+        if (!isRolling && !isLerping)
+        {
+            StartCoroutine(LerpToPositionInternal(targetPosition));
+        }
+    }
+
+    /// <summary>
+    /// Set the dice rotation to display a specific face value pointing up.
+    /// Does not animate, sets rotation instantly.
+    /// </summary>
+    public void SetRotationForFaceValue(int faceValue)
+    {
+        transform.rotation = GetRotationForFaceValue(faceValue);
+        lastRollValue = faceValue;
+    }
+
     public void SetTargetArea(DB_DiceTargetArea area)
     {
         targetArea = area;
