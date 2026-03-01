@@ -240,12 +240,8 @@ public class DiceBag : MonoBehaviour
             
             if (diceController != null)
             {
-                // Disable colliders to prevent interaction
-                Collider[] colliders = dicInstance.GetComponentsInChildren<Collider>();
-                foreach (var collider in colliders)
-                {
-                    collider.enabled = false;
-                }
+                // Set the die data reference
+                diceController.SetDieData(dieData);
 
                 // Disable gravity and make kinematic to prevent falling
                 Rigidbody rb = dicInstance.GetComponent<Rigidbody>();
@@ -258,6 +254,9 @@ public class DiceBag : MonoBehaviour
                 // Set rotation to show highest face value
                 int highestFaceValue = GetHighestFaceValue(dieData);
                 diceController.SetRotationForFaceValue(highestFaceValue);
+
+                // Make clickable to show info (toggle on click)
+                diceController.SetClickable(true, (diceCtrl) => diceCtrl.ShowDiceInfo());
 
                 instantiatedDice.Add(diceController);
                 diceController.Initialize(spawnPoint.position);
@@ -451,7 +450,7 @@ public class DiceBag : MonoBehaviour
 
         // Draw grid center point
         Gizmos.color = Color.cyan;
-        Gizmos.DrawSphere(centerPos, 0.15f);
+        Gizmos.DrawSphere(centerPos, 0.015f);
 
         // Draw preview dice positions
         Gizmos.color = new Color(1f, 0.5f, 0f, 0.3f);

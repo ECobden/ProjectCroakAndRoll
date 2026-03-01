@@ -33,6 +33,9 @@ public class DB_DiceController : MonoBehaviour
     [SerializeField] private GameObject destroyHighlightObject;
     [SerializeField] private GameObject swapHighlightObject;
     
+    [Header("Dice Information Display")]
+    [SerializeField] private float diceInfoVerticalOffset = 1.2f;
+    
     [Header("Particle Effects")]
     [SerializeField] private GameObject destroyParticleEffectPrefab;
     
@@ -49,6 +52,11 @@ public class DB_DiceController : MonoBehaviour
     private System.Action<int> onRollComplete;
     private float lastCollisionTime = 0f;
     
+    // Die data and information
+    private DieData currentDieData;
+    private DB_UIManager uiManager;
+    private static DB_DiceController activeInfoDice;
+    
     // Highlighting system
     private bool isHighlighted = false;
     private System.Action<DB_DiceController> onDiceClicked;
@@ -61,6 +69,7 @@ public class DB_DiceController : MonoBehaviour
     private void Start()
     {
         rb = GetComponent<Rigidbody>();
+        uiManager = DB_UIManager.Instance != null ? DB_UIManager.Instance : FindFirstObjectByType<DB_UIManager>();
         
         // Ensure highlight objects start disabled
         if (destroyHighlightObject != null)
@@ -144,6 +153,79 @@ public class DB_DiceController : MonoBehaviour
     {
         transform.rotation = GetRotationForFaceValue(faceValue);
         lastRollValue = faceValue;
+    }
+
+    /// <summary>
+    /// Set the die data for this controller.
+    /// Called when the die is instantiated from a DieData.
+    /// </summary>
+    public void SetDieData(DieData dieData)
+    {
+        currentDieData = dieData;
+    }
+
+    /// <summary>
+    /// Show the dice information UI panel.
+    /// </summary>
+    public void ShowDiceInfo()
+    {
+        if (currentDieData == null)
+        {
+            Debug.LogWarning("No DieData assigned to this dice controller!");
+            return;
+        }
+
+        if (uiManager == null)
+        {
+            uiManager = DB_UIManager.Instance != null ? DB_UIManager.Instance : FindFirstObjectByType<DB_UIManager>();
+        }
+
+        if (uiManager == null)
+        {
+            Debug.LogWarning("DB_UIManager not found. Cannot show dice info panel.");
+            return;
+        }
+
+        // Toggle off if this die is already the active one
+        if (activeInfoDice == this && uiManager.IsDiceInfoPanelVisible())
+        {
+            HideDiceInfo();
+            return;
+        }
+
+        activeInfoDice = this;
+
+        Vector3 panelWorldPosition = transform.position + (Vector3.up * diceInfoVerticalOffset);
+        uiManager.ShowDiceInfoPanel(currentDieData, panelWorldPosition);
+    }
+
+    /// <summary>
+    /// Hide the dice information UI panel.
+    /// </summary>
+    public void HideDiceInfo()
+    {
+        if (uiManager == null)
+        {
+            uiManager = DB_UIManager.Instance != null ? DB_UIManager.Instance : FindFirstObjectByType<DB_UIManager>();
+        }
+
+        if (uiManager != null)
+        {
+            uiManager.HideDiceInfoPanel();
+        }
+
+        if (activeInfoDice == this)
+        {
+            activeInfoDice = null;
+        }
+    }
+
+    /// <summary>
+    /// Check if the dice info panel is currently open.
+    /// </summary>
+    public bool HasInfoPanelOpen()
+    {
+        return activeInfoDice == this && uiManager != null && uiManager.IsDiceInfoPanelVisible();
     }
 
     public void SetTargetArea(DB_DiceTargetArea area)

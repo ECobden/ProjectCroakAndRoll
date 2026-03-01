@@ -343,6 +343,7 @@ MonoBehaviour:
   collisionCooldown: 0.1
   destroyHighlightObject: {fileID: 479331340397631884}
   swapHighlightObject: {fileID: 6250263266430740617}
+  diceInfoVerticalOffset: 0.15
   destroyParticleEffectPrefab: {fileID: 2720232870964781117, guid: eb300f0f67749974a99e372ebac885e9, type: 3}
 --- !u!82 &5837244478513237637
 AudioSource:

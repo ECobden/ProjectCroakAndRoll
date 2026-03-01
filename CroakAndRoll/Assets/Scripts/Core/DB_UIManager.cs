@@ -8,6 +8,8 @@ using DG.Tweening;
 // UI Manager for dice battle game
 public class DB_UIManager : MonoBehaviour
 {
+    public static DB_UIManager Instance { get; private set; }
+
     #region Serialized Fields
 
     [Header("UI References")]
@@ -32,6 +34,9 @@ public class DB_UIManager : MonoBehaviour
     [SerializeField] private float deleteSpeed = 0.05f;
     [SerializeField] private float typeSpeed = 0.05f;
 
+    [Header("Dice Info Display")]
+    [SerializeField] private DiceInfoPanel diceInfoPanel;
+
     #endregion
 
     #region Private Fields
@@ -44,6 +49,17 @@ public class DB_UIManager : MonoBehaviour
     #endregion
 
     #region Initialization
+
+    private void Awake()
+    {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        Instance = this;
+    }
 
     public void Initialize(Action onRestartClicked)
     {
@@ -72,6 +88,68 @@ public class DB_UIManager : MonoBehaviour
 
         if (gameOverPanel != null)
             gameOverPanel.SetActive(false);
+    }
+
+    #endregion
+
+    #region Dice Info Display
+
+    public void ShowDiceInfoPanel(DieData dieData, Vector3 worldPosition)
+    {
+        if (diceInfoPanel == null)
+        {
+            Debug.LogWarning("[DB_UIManager] DiceInfoPanel reference is not assigned.");
+            return;
+        }
+
+        diceInfoPanel.gameObject.SetActive(true);
+        diceInfoPanel.SetDiceInfo(dieData);
+        diceInfoPanel.SetCloseCallback(HideDiceInfoPanel);
+        PositionDiceInfoPanel(worldPosition);
+    }
+
+    public void HideDiceInfoPanel()
+    {
+        if (diceInfoPanel != null)
+        {
+            diceInfoPanel.gameObject.SetActive(false);
+        }
+    }
+
+    public bool IsDiceInfoPanelVisible()
+    {
+        return diceInfoPanel != null && diceInfoPanel.gameObject.activeSelf;
+    }
+
+    private void PositionDiceInfoPanel(Vector3 worldPosition)
+    {
+        if (diceInfoPanel == null)
+            return;
+
+        RectTransform panelRect = diceInfoPanel.transform as RectTransform;
+        Canvas canvas = diceInfoPanel.GetComponentInParent<Canvas>();
+
+        if (panelRect == null || canvas == null)
+        {
+            Debug.LogWarning("[DB_UIManager] Dice info panel must be under a Canvas with RectTransform.");
+            return;
+        }
+
+        Camera worldCamera = Camera.main;
+        Vector3 screenPoint = worldCamera != null
+            ? worldCamera.WorldToScreenPoint(worldPosition)
+            : new Vector3(Screen.width * 0.5f, Screen.height * 0.5f, 0f);
+
+        Camera uiCamera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+
+        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                canvas.transform as RectTransform,
+                screenPoint,
+                uiCamera,
+                out Vector2 localPoint))
+        {
+            panelRect.anchoredPosition = localPoint;
+        }
     }
 
     #endregion
