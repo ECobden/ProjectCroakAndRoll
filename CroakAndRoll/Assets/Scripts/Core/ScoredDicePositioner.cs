@@ -80,7 +80,7 @@ public class ScoredDicePositioner : MonoBehaviour
     /// </summary>
     public IEnumerator AddDiceRowCoroutine(DB_DiceController diceA, DB_DiceController diceB)
     {
-        if (diceA == null || diceB == null)
+        if (diceA == null && diceB == null)
         {
             Debug.LogWarning("Cannot add dice row with null dice!");
             yield break;
@@ -100,13 +100,16 @@ public class ScoredDicePositioner : MonoBehaviour
         
         diceRows.Add(newRow);
         
-        // Move and straighten the dice - start both coroutines
-        Coroutine moveA = StartCoroutine(MoveDiceToPosition(diceA, newRow.positionA));
-        Coroutine moveB = StartCoroutine(MoveDiceToPosition(diceB, newRow.positionB));
-        
-        // Wait for both movements to complete
-        yield return moveA;
-        yield return moveB;
+        // Move and straighten the dice
+        if (diceA != null)
+        {
+            yield return StartCoroutine(MoveDiceToPosition(diceA, newRow.positionA));
+        }
+
+        if (diceB != null)
+        {
+            yield return StartCoroutine(MoveDiceToPosition(diceB, newRow.positionB));
+        }
         
         Debug.Log($"{gameObject.name}: Added row {rowIndex} with dice at positions {newRow.positionA} and {newRow.positionB}");
         

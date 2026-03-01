@@ -1,6 +1,7 @@
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using TMPro;
 
 /// <summary>
@@ -44,6 +45,7 @@ public class House : Participant
         lastDiceA = 0;
         lastDiceB = 0;
         currentStandValue = defaultStandValue;
+        InitializeRoundDiceAvailability();
         
         // Reset roll progress at round start
         if (uiManager != null)
@@ -103,9 +105,17 @@ public class House : Participant
             
             Debug.Log($"[HOUSE AI] Deciding to ROLL (current: {GetTurnValue()}, target: {GetPlayerScore()})");
         }
+
+        int drawnCount = ConsumeRoundDiceForRoll(2, out List<DieData> selectedDice);
+        if (drawnCount == 0)
+        {
+            Debug.Log("[HOUSE] No dice available in round pool. Auto-standing.");
+            Stand();
+            return;
+        }
         
         Debug.Log("House calling diceManager.RollDiceAndGetResults");
-        StartCoroutine(diceManager.RollDiceAndGetResults(OnDiceRolled, false)); // false = house turn
+        StartCoroutine(diceManager.RollDiceAndGetResults(OnDiceRolled, false, selectedDice)); // false = house turn
     }
 
     private void OnDiceRolled(int diceAValue, int diceBValue)
@@ -161,9 +171,15 @@ public class House : Participant
     private bool ShouldHouseStand()
     {
         if (gameManager == null) return false;
+
+        if (GetRoundAvailableDiceCount() <= 0)
+        {
+            return true;
+        }
         
-        int houseTotal = GetTurnValue();
+        int houseTotal = gameManager.GetHouseRoundTotal();
         int playerTotal = GetPlayerScore();
+        List<DieData> availableDice = GetRoundAvailableDice();
         
         // Always roll if we have nothing
         if (houseTotal == 0) return false;
@@ -186,10 +202,10 @@ public class House : Participant
         if (houseTotal < playerTotal)
         {
             // Calculate bust probability
-            float bustProbability = CalculateBustProbability(houseTotal);
+            float bustProbability = CalculateBustProbability(houseTotal, availableDice);
             
             // Calculate win probability (need to beat player without busting)
-            float winProbability = CalculateWinProbability(houseTotal, playerTotal);
+            float winProbability = CalculateWinProbability(houseTotal, playerTotal, availableDice);
             
             Debug.Log($"[HOUSE AI] Analysis - Bust: {bustProbability:P0}, Win: {winProbability:P0}");
             
@@ -220,67 +236,125 @@ public class House : Participant
     /// <summary>
     /// Calculate probability of busting on next roll
     /// </summary>
-    private float CalculateBustProbability(int currentTotal)
+    private float CalculateBustProbability(int currentTotal, List<DieData> availableDice)
     {
         if (currentTotal >= 21) return 1f;
-        if (currentTotal <= 10) return 0f; // Can't bust with lowest roll (2)
+        if (availableDice == null || availableDice.Count == 0) return 0f;
         
-        int maxSafeValue = 21 - currentTotal;
+        float bustProbability = 0f;
+        Dictionary<int, float> rollProbabilities = BuildRollTotalProbabilities(availableDice);
         
-        // Count how many dice combinations would bust
-        // Possible rolls: 2-12 (36 combinations total)
-        int bustCombinations = 0;
-        int totalCombinations = 0;
-        
-        for (int diceA = 1; diceA <= 6; diceA++)
+        foreach (var kvp in rollProbabilities)
         {
-            for (int diceB = 1; diceB <= 6; diceB++)
+            if (currentTotal + kvp.Key > 21)
             {
-                totalCombinations++;
-                if (diceA + diceB > maxSafeValue)
-                {
-                    bustCombinations++;
-                }
+                bustProbability += kvp.Value;
             }
         }
-        
-        return (float)bustCombinations / totalCombinations;
+
+        return Mathf.Clamp01(bustProbability);
     }
     
     /// <summary>
     /// Calculate probability of winning (beating player without busting)
     /// </summary>
-    private float CalculateWinProbability(int currentTotal, int playerTotal)
+    private float CalculateWinProbability(int currentTotal, int playerTotal, List<DieData> availableDice)
     {
         if (currentTotal >= playerTotal && currentTotal <= 21) return 1f; // Already winning
         if (currentTotal > 21) return 0f; // Already bust
+        if (availableDice == null || availableDice.Count == 0) return 0f;
         
-        int neededMin = playerTotal - currentTotal + 1; // Minimum to beat player
-        int maxSafe = 21 - currentTotal; // Maximum without busting
-        
-        if (neededMin > maxSafe) return 0f; // Can't win without busting
-        
-        // Count combinations that would win
-        int winCombinations = 0;
-        int totalCombinations = 0;
-        
-        for (int diceA = 1; diceA <= 6; diceA++)
+        float winProbability = 0f;
+        Dictionary<int, float> rollProbabilities = BuildRollTotalProbabilities(availableDice);
+
+        foreach (var kvp in rollProbabilities)
         {
-            for (int diceB = 1; diceB <= 6; diceB++)
+            int newTotal = currentTotal + kvp.Key;
+            if (newTotal >= playerTotal && newTotal <= 21)
             {
-                totalCombinations++;
-                int rollTotal = diceA + diceB;
-                int newTotal = currentTotal + rollTotal;
-                
-                // Wins if: beats player and doesn't bust
-                if (newTotal >= playerTotal && newTotal <= 21)
+                winProbability += kvp.Value;
+            }
+        }
+
+        return Mathf.Clamp01(winProbability);
+    }
+
+    /// <summary>
+    /// Build probability distribution for next roll total using remaining round-available dice.
+    /// Draws up to 2 dice without replacement.
+    /// </summary>
+    private Dictionary<int, float> BuildRollTotalProbabilities(List<DieData> availableDice)
+    {
+        Dictionary<int, float> rollTotalToProbability = new Dictionary<int, float>();
+
+        if (availableDice == null || availableDice.Count == 0)
+        {
+            return rollTotalToProbability;
+        }
+
+        if (availableDice.Count == 1)
+        {
+            int[] faces = GetDieFaces(availableDice[0]);
+            float faceProbability = 1f / faces.Length;
+            for (int faceIndex = 0; faceIndex < faces.Length; faceIndex++)
+            {
+                int rollTotal = faces[faceIndex];
+                if (!rollTotalToProbability.ContainsKey(rollTotal))
+                    rollTotalToProbability[rollTotal] = 0f;
+
+                rollTotalToProbability[rollTotal] += faceProbability;
+            }
+
+            return rollTotalToProbability;
+        }
+
+        int diceCount = availableDice.Count;
+        float pairDrawProbability = 2f / (diceCount * (diceCount - 1));
+
+        for (int i = 0; i < diceCount - 1; i++)
+        {
+            int[] facesA = GetDieFaces(availableDice[i]);
+
+            for (int j = i + 1; j < diceCount; j++)
+            {
+                int[] facesB = GetDieFaces(availableDice[j]);
+                float faceOutcomeProbability = pairDrawProbability / (facesA.Length * facesB.Length);
+
+                for (int faceA = 0; faceA < facesA.Length; faceA++)
                 {
-                    winCombinations++;
+                    for (int faceB = 0; faceB < facesB.Length; faceB++)
+                    {
+                        int rollTotal = facesA[faceA] + facesB[faceB];
+                        if (!rollTotalToProbability.ContainsKey(rollTotal))
+                            rollTotalToProbability[rollTotal] = 0f;
+
+                        rollTotalToProbability[rollTotal] += faceOutcomeProbability;
+                    }
                 }
             }
         }
-        
-        return (float)winCombinations / totalCombinations;
+
+        float totalProbability = rollTotalToProbability.Values.Sum();
+        if (totalProbability > 0f)
+        {
+            List<int> keys = new List<int>(rollTotalToProbability.Keys);
+            foreach (int key in keys)
+            {
+                rollTotalToProbability[key] /= totalProbability;
+            }
+        }
+
+        return rollTotalToProbability;
+    }
+
+    private int[] GetDieFaces(DieData die)
+    {
+        if (die != null && die.faceValues != null && die.faceValues.Length > 0)
+        {
+            return die.faceValues;
+        }
+
+        return new int[] { 1, 2, 3, 4, 5, 6 };
     }
     
     /// <summary>

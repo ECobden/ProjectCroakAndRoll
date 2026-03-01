@@ -25,6 +25,7 @@ public class DiceBag : MonoBehaviour
 
     private List<DieData> diceCollection = new List<DieData>();
     private List<DB_DiceController> instantiatedDice = new List<DB_DiceController>(); // Track instantiated dice
+    private List<DieData> displayDiceOverride = null;
     private System.Random random = new System.Random();
     private bool isBagOpen = false;
 
@@ -107,6 +108,32 @@ public class DiceBag : MonoBehaviour
         return DrawRandomDice(dicePerRoll);
     }
 
+    /// <summary>
+    /// Draw multiple random dice without replacement from a provided source list.
+    /// This helper does not modify the bag's owned inventory.
+    /// </summary>
+    public List<DieData> DrawRandomDiceFromList(List<DieData> source, int count)
+    {
+        List<DieData> drawn = new List<DieData>();
+
+        if (source == null || source.Count == 0 || count <= 0)
+        {
+            return drawn;
+        }
+
+        List<DieData> working = new List<DieData>(source);
+        int drawCount = Mathf.Min(count, working.Count);
+
+        for (int i = 0; i < drawCount; i++)
+        {
+            int index = random.Next(working.Count);
+            drawn.Add(working[index]);
+            working.RemoveAt(index);
+        }
+
+        return drawn;
+    }
+
     #endregion
 
     #region Inventory Management
@@ -178,13 +205,15 @@ public class DiceBag : MonoBehaviour
     /// </summary>
     public void ShowBag()
     {
+        List<DieData> displayDice = GetDisplayDiceForView();
+
         if (isBagOpen)
         {
             Debug.LogWarning("Dice bag is already open!");
             return;
         }
 
-        if (diceCollection.Count == 0)
+        if (displayDice.Count == 0)
         {
             Debug.LogWarning("No dice to display! Dice bag is empty.");
             return;
@@ -197,7 +226,7 @@ public class DiceBag : MonoBehaviour
         }
 
         // Validate that all dice have prefabs assigned
-        foreach (var die in diceCollection)
+        foreach (var die in displayDice)
         {
             if (die.diePrefab == null)
             {
@@ -208,7 +237,7 @@ public class DiceBag : MonoBehaviour
 
         isBagOpen = true;
         instantiatedDice.Clear();
-        StartCoroutine(ShowBagCoroutine());
+        StartCoroutine(ShowBagCoroutine(displayDice));
     }
 
     /// <summary>
@@ -229,12 +258,12 @@ public class DiceBag : MonoBehaviour
     /// <summary>
     /// Coroutine to instantiate dice and move them to grid positions one by one.
     /// </summary>
-    private IEnumerator ShowBagCoroutine()
+    private IEnumerator ShowBagCoroutine(List<DieData> displayDice)
     {
         // Instantiate all dice at spawn point
-        for (int i = 0; i < diceCollection.Count; i++)
+        for (int i = 0; i < displayDice.Count; i++)
         {
-            DieData dieData = diceCollection[i];
+            DieData dieData = displayDice[i];
             GameObject dicInstance = Instantiate(dieData.diePrefab, spawnPoint.position, Quaternion.identity);
             DB_DiceController diceController = dicInstance.GetComponent<DB_DiceController>();
             
@@ -373,15 +402,31 @@ public class DiceBag : MonoBehaviour
     /// </summary>
     public string GetBagSummary()
     {
-        if (diceCollection.Count == 0)
+        List<DieData> displayDice = GetDisplayDiceForView();
+
+        if (displayDice.Count == 0)
             return "Dice Bag is empty";
 
         // Group by die type
-        var grouped = diceCollection
+        var grouped = displayDice
             .GroupBy(d => d.dieName)
             .Select(g => $"{g.Key} x{g.Count()}");
 
         return "Dice: " + string.Join(", ", grouped);
+    }
+
+    /// <summary>
+    /// Set a temporary display source for bag viewing (for example, round-available dice).
+    /// Passing null clears the override and reverts to full owned inventory.
+    /// </summary>
+    public void SetDisplayDiceOverride(List<DieData> dice)
+    {
+        displayDiceOverride = dice != null ? new List<DieData>(dice) : null;
+    }
+
+    private List<DieData> GetDisplayDiceForView()
+    {
+        return displayDiceOverride != null ? displayDiceOverride : diceCollection;
     }
 
     #endregion

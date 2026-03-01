@@ -33,6 +33,8 @@ public abstract class Participant : MonoBehaviour
     protected int rollCount = 0;
     protected bool hasStood = false;
     protected bool canAct = false;
+    protected List<DieData> roundAvailableDice = new List<DieData>();
+    protected List<DieData> lastConsumedRollDice = new List<DieData>();
 
     #endregion
 
@@ -126,6 +128,10 @@ public abstract class Participant : MonoBehaviour
         rollCount = 0;
         rollHistory.Clear();
         hasStood = false;
+        roundAvailableDice.Clear();
+        lastConsumedRollDice.Clear();
+        if (diceBag != null)
+            diceBag.SetDisplayDiceOverride(null);
         Debug.Log($"{gameObject.name} reset for new round");
     }
 
@@ -265,6 +271,77 @@ public abstract class Participant : MonoBehaviour
     public int GetDiceCount()
     {
         return diceBag != null ? diceBag.GetDiceCount() : 0;
+    }
+
+    /// <summary>
+    /// Initializes temporary round-available dice from owned bag inventory.
+    /// </summary>
+    public virtual void InitializeRoundDiceAvailability()
+    {
+        if (diceBag == null)
+        {
+            roundAvailableDice.Clear();
+            lastConsumedRollDice.Clear();
+            Debug.LogWarning($"{gameObject.name} has no dice bag assigned!");
+            return;
+        }
+
+        roundAvailableDice = diceBag.GetAllDice();
+        lastConsumedRollDice.Clear();
+        diceBag.SetDisplayDiceOverride(roundAvailableDice);
+        Debug.Log($"{gameObject.name} round dice pool initialized with {roundAvailableDice.Count} dice");
+    }
+
+    /// <summary>
+    /// Consume up to requested dice from this round's available pool.
+    /// </summary>
+    public int ConsumeRoundDiceForRoll(int requestedCount, out List<DieData> consumedDice)
+    {
+        consumedDice = new List<DieData>();
+
+        if (requestedCount <= 0 || roundAvailableDice.Count == 0)
+        {
+            lastConsumedRollDice = consumedDice;
+            return 0;
+        }
+
+        int toDraw = Mathf.Min(requestedCount, roundAvailableDice.Count);
+
+        for (int i = 0; i < toDraw; i++)
+        {
+            int randomIndex = Random.Range(0, roundAvailableDice.Count);
+            consumedDice.Add(roundAvailableDice[randomIndex]);
+            roundAvailableDice.RemoveAt(randomIndex);
+        }
+
+        lastConsumedRollDice = new List<DieData>(consumedDice);
+        if (diceBag != null)
+            diceBag.SetDisplayDiceOverride(roundAvailableDice);
+        return consumedDice.Count;
+    }
+
+    /// <summary>
+    /// Gets remaining dice available to roll this round.
+    /// </summary>
+    public int GetRoundAvailableDiceCount()
+    {
+        return roundAvailableDice.Count;
+    }
+
+    /// <summary>
+    /// Gets a copy of remaining round-available dice.
+    /// </summary>
+    public List<DieData> GetRoundAvailableDice()
+    {
+        return new List<DieData>(roundAvailableDice);
+    }
+
+    /// <summary>
+    /// Gets the dice consumed on the last roll request.
+    /// </summary>
+    public List<DieData> GetLastConsumedRollDice()
+    {
+        return new List<DieData>(lastConsumedRollDice);
     }
 
     #endregion

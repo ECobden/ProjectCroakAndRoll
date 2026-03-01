@@ -38,8 +38,16 @@ public class Player : Participant
     public override void RollDice()
     {
         if (!canAct || diceManager == null || diceManager.IsDiceRolling()) return;
+
+        int drawnCount = ConsumeRoundDiceForRoll(2, out List<DieData> selectedDice);
+        if (drawnCount == 0)
+        {
+            Debug.Log("[PLAYER] No dice available in round pool. Auto-standing.");
+            Stand();
+            return;
+        }
         
-        StartCoroutine(diceManager.RollDiceAndGetResults(OnDiceRolled, true)); // true = player turn
+        StartCoroutine(diceManager.RollDiceAndGetResults(OnDiceRolled, true, selectedDice)); // true = player turn
     }
 
     private void OnDiceRolled(int diceAValue, int diceBValue)
@@ -60,6 +68,7 @@ public class Player : Participant
         rollCount = 0;
         canAct = true;
         hasRolledThisTurn = false;
+        InitializeRoundDiceAvailability();
         
         // Hide stand value UI and reset progress at start of new round
         if (uiManager != null)

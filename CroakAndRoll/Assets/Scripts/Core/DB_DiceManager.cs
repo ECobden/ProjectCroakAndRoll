@@ -109,15 +109,15 @@ public class DB_DiceManager : MonoBehaviour
     /// <summary>
     /// Roll dice and handle all results (scoring, positioning, callbacks)
     /// </summary>
-    public IEnumerator RollDiceAndGetResults(System.Action<int, int> onComplete, bool isPlayerTurn)
+    public IEnumerator RollDiceAndGetResults(System.Action<int, int> onComplete, bool isPlayerTurn, List<DieData> selectedDice = null)
     {
-        yield return StartCoroutine(RollDiceCoroutine(onComplete, isPlayerTurn));
+        yield return StartCoroutine(RollDiceCoroutine(onComplete, isPlayerTurn, selectedDice));
     }
 
     /// <summary>
     /// Orchestrates the rolling and result handling phases
     /// </summary>
-    private IEnumerator RollDiceCoroutine(System.Action<int, int> onComplete, bool isPlayerTurn)
+    private IEnumerator RollDiceCoroutine(System.Action<int, int> onComplete, bool isPlayerTurn, List<DieData> selectedDice)
     {
         if (isDiceRolling)
         {
@@ -125,11 +125,18 @@ public class DB_DiceManager : MonoBehaviour
             yield break;
         }
 
+        int diceToRoll = selectedDice == null ? 2 : Mathf.Clamp(selectedDice.Count, 0, 2);
+        if (diceToRoll <= 0)
+        {
+            onComplete?.Invoke(0, 0);
+            yield break;
+        }
+
         isDiceRolling = true;
         
         // Phase 1: Roll the dice
         Vector3 launchPos = GetRandomLaunchPosition();
-        yield return StartCoroutine(PerformDiceRoll(launchPos));
+        yield return StartCoroutine(PerformDiceRoll(launchPos, selectedDice));
         
         // Get dice values after rolling
         int diceAValue = diceControllerA != null ? diceControllerA.GetLastRollValue() : 0;
@@ -146,18 +153,36 @@ public class DB_DiceManager : MonoBehaviour
     /// <summary>
     /// Phase 1: Spawn, initialize, and roll the dice
     /// </summary>
-    private IEnumerator PerformDiceRoll(Vector3 launchPos)
+    private IEnumerator PerformDiceRoll(Vector3 launchPos, List<DieData> selectedDice)
     {
+        int diceToRoll = selectedDice == null ? 2 : Mathf.Clamp(selectedDice.Count, 0, 2);
+
         // Spawn fresh dice at launch position
         SpawnSharedDice(launchPos);
         InitializeSharedDice(launchPos);
 
+        if (diceToRoll >= 1 && diceControllerA != null && selectedDice != null && selectedDice.Count >= 1)
+        {
+            diceControllerA.SetDieData(selectedDice[0]);
+        }
+
+        if (diceToRoll >= 2 && diceControllerB != null && selectedDice != null && selectedDice.Count >= 2)
+        {
+            diceControllerB.SetDieData(selectedDice[1]);
+        }
+
         // Tell dice to roll from their offset positions
-        if (diceControllerA != null)
+        if (diceToRoll >= 1 && diceControllerA != null)
             diceControllerA.RollFromLaunchPosition(launchPos + Vector3.left * diceSpawnXOffset);
 
-        if (diceControllerB != null)
+        if (diceToRoll >= 2 && diceControllerB != null)
             diceControllerB.RollFromLaunchPosition(launchPos + Vector3.right * diceSpawnXOffset);
+
+        if (diceToRoll < 2 && diceControllerB != null)
+        {
+            diceControllerB.DestroyWithEffect();
+            diceControllerB = null;
+        }
 
         // Wait one frame to ensure roll coroutines have started
         yield return null;
@@ -217,7 +242,7 @@ public class DB_DiceManager : MonoBehaviour
     public void RollDice(System.Action<int, int> onComplete, bool isPlayerTurn)
     {
         if (isDiceRolling) return;
-        StartCoroutine(RollDiceAndGetResults(onComplete, isPlayerTurn));
+        StartCoroutine(RollDiceAndGetResults(onComplete, isPlayerTurn, null));
     }
 
     #endregion
