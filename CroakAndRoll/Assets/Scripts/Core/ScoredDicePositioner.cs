@@ -104,11 +104,13 @@ public class ScoredDicePositioner : MonoBehaviour
         if (diceA != null)
         {
             yield return StartCoroutine(MoveDiceToPosition(diceA, newRow.positionA));
+            diceA.SetClickable(true, (dice) => dice.ShowDiceInfo());
         }
 
         if (diceB != null)
         {
             yield return StartCoroutine(MoveDiceToPosition(diceB, newRow.positionB));
+            diceB.SetClickable(true, (dice) => dice.ShowDiceInfo());
         }
         
         Debug.Log($"{gameObject.name}: Added row {rowIndex} with dice at positions {newRow.positionA} and {newRow.positionB}");
@@ -291,12 +293,12 @@ public class ScoredDicePositioner : MonoBehaviour
             if (row.diceA != null)
             {
                 row.diceA.RemoveHighlight();
-                row.diceA.SetClickable(false);
+                row.diceA.SetClickable(true, (dice) => dice.ShowDiceInfo());
             }
             if (row.diceB != null)
             {
                 row.diceB.RemoveHighlight();
-                row.diceB.SetClickable(false);
+                row.diceB.SetClickable(true, (dice) => dice.ShowDiceInfo());
             }
         }
     }

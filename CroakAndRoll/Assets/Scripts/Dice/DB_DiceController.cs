@@ -100,6 +100,8 @@ public class DB_DiceController : MonoBehaviour
 
     #region Public API
 
+    public Rigidbody Rb => rb;
+
     public void RollDice()
     {
         if (isRolling) return;
@@ -129,7 +131,7 @@ public class DB_DiceController : MonoBehaviour
     {
         if (!isRolling && !isLerping)
         {
-            StartCoroutine(LerpToPositionInternal(idlePosition));
+            StartCoroutine(LerpToPositionInternal(idlePosition, false));
         }
     }
 
@@ -137,11 +139,11 @@ public class DB_DiceController : MonoBehaviour
     /// Lerp the dice to a specified position.
     /// Useful for displaying dice in the dice bag grid.
     /// </summary>
-    public void LerpToPosition(Vector3 targetPosition)
+    public void LerpToPosition(Vector3 targetPosition, bool keepKinematic = false)
     {
         if (!isRolling && !isLerping)
         {
-            StartCoroutine(LerpToPositionInternal(targetPosition));
+            StartCoroutine(LerpToPositionInternal(targetPosition, keepKinematic));
         }
     }
 
@@ -379,7 +381,7 @@ public class DB_DiceController : MonoBehaviour
         isRolling = true;
 
         // Lerp to launch position
-        yield return StartCoroutine(LerpToPositionInternal(launchPosition));
+        yield return StartCoroutine(LerpToPositionInternal(launchPosition, false));
 
         // Small delay at launch position
         yield return new WaitForSeconds(0.2f);
@@ -689,7 +691,7 @@ public class DB_DiceController : MonoBehaviour
         }
     }
 
-    private IEnumerator LerpToPositionInternal(Vector3 targetPosition)
+    private IEnumerator LerpToPositionInternal(Vector3 targetPosition, bool keepKinematic = false)
     {
         isLerping = true;
 
@@ -697,6 +699,11 @@ public class DB_DiceController : MonoBehaviour
         {
             // Must set kinematic first before clearing velocities
             rb.isKinematic = true;
+            // If keeping kinematic for bag display, also freeze rotations
+            if (keepKinematic)
+            {
+                rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationY | RigidbodyConstraints.FreezeRotationZ;
+            }
         }
 
         Vector3 startPosition = transform.position;
@@ -712,22 +719,26 @@ public class DB_DiceController : MonoBehaviour
 
         transform.position = targetPosition;
         
-        // Check if we're returning to idle position - if so, stay kinematic
+        // Set physics based on keepKinematic parameter
         if (rb != null)
         {
-            if (Vector3.Distance(targetPosition, idlePosition) < 0.01f)
+            if (keepKinematic)
             {
-                // At idle position - stay kinematic for score calculation
+                // Keep kinematic for display purposes (e.g., bag view)
                 rb.isKinematic = true;
                 rb.useGravity = false;
+                // Ensure rotations stay frozen
+                rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationY | RigidbodyConstraints.FreezeRotationZ;
             }
             else
             {
-                // At launch position - prepare for physics roll
+                // Prepare for physics roll
                 rb.isKinematic = false;
                 rb.useGravity = false;
                 rb.linearVelocity = Vector3.zero;
                 rb.angularVelocity = Vector3.zero;
+                // Clear constraints for rolling physics
+                rb.constraints = RigidbodyConstraints.None;
             }
         }
         

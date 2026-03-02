@@ -201,6 +201,21 @@ public class DiceBag : MonoBehaviour
     #region Visual Bag Display
 
     /// <summary>
+    /// Toggle the dice bag open/closed. Opens if closed, closes if open.
+    /// </summary>
+    public void ToggleBag()
+    {
+        if (isBagOpen)
+        {
+            CloseBag();
+        }
+        else
+        {
+            ShowBag();
+        }
+    }
+
+    /// <summary>
     /// Show the dice bag by instantiating all dice and positioning them in a grid.
     /// </summary>
     public void ShowBag()
@@ -260,7 +275,7 @@ public class DiceBag : MonoBehaviour
     /// </summary>
     private IEnumerator ShowBagCoroutine(List<DieData> displayDice)
     {
-        // Instantiate all dice at spawn point
+        // Instantiate and immediately move dice to grid positions
         for (int i = 0; i < displayDice.Count; i++)
         {
             DieData dieData = displayDice[i];
@@ -273,11 +288,12 @@ public class DiceBag : MonoBehaviour
                 diceController.SetDieData(dieData);
 
                 // Disable gravity and make kinematic to prevent falling
-                Rigidbody rb = dicInstance.GetComponent<Rigidbody>();
-                if (rb != null)
+                if (diceController.Rb != null)
                 {
-                    rb.isKinematic = true;
-                    rb.useGravity = false;
+                    diceController.Rb.isKinematic = true;
+                    diceController.Rb.useGravity = false;
+                    // Freeze rotations for bag display
+                    diceController.Rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationY | RigidbodyConstraints.FreezeRotationZ;
                 }
 
                 // Set rotation to show highest face value
@@ -289,6 +305,10 @@ public class DiceBag : MonoBehaviour
 
                 instantiatedDice.Add(diceController);
                 diceController.Initialize(spawnPoint.position);
+
+                // Immediately start moving to grid position
+                Vector3 gridPosition = CalculateGridPosition(i);
+                StartCoroutine(MoveDiceToPosition(diceController, gridPosition, true));
             }
             else
             {
@@ -297,14 +317,6 @@ public class DiceBag : MonoBehaviour
             }
 
             yield return new WaitForSeconds(instantiationDelay);
-        }
-
-        // Move dice to grid positions one by one
-        foreach (var diceController in instantiatedDice)
-        {
-            Vector3 gridPosition = CalculateGridPosition(instantiatedDice.IndexOf(diceController));
-            StartCoroutine(MoveDiceToPosition(diceController, gridPosition));
-            yield return new WaitForSeconds(positioningDelay);
         }
 
         Debug.Log($"Dice bag opened with {instantiatedDice.Count} dice displayed");
@@ -320,7 +332,7 @@ public class DiceBag : MonoBehaviour
         {
             if (instantiatedDice[i] != null)
             {
-                StartCoroutine(MoveDiceToPosition(instantiatedDice[i], spawnPoint.position, true));
+                StartCoroutine(MoveDiceToPosition(instantiatedDice[i], spawnPoint.position, false, true));
                 yield return new WaitForSeconds(positioningDelay);
             }
         }
@@ -344,12 +356,12 @@ public class DiceBag : MonoBehaviour
     /// <summary>
     /// Move a die to a target position using the DB_DiceController's lerp method.
     /// </summary>
-    private IEnumerator MoveDiceToPosition(DB_DiceController diceController, Vector3 targetPosition, bool destroy = false)
+    private IEnumerator MoveDiceToPosition(DB_DiceController diceController, Vector3 targetPosition, bool keepKinematic = false, bool destroy = false)
     {
         if (diceController == null)
             yield break;
 
-        diceController.LerpToPosition(targetPosition);
+        diceController.LerpToPosition(targetPosition, keepKinematic);
 
         // Wait for the lerp to complete (matching moveLerpDuration from DB_DiceController)
         yield return new WaitForSeconds(0.5f);
