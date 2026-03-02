@@ -55,9 +55,9 @@ public class Player : Participant
         // Handle roll through game manager for alternating mode
         if (gameManager != null)
         {
-            
             hasRolledThisTurn = true;
             RecordRoll(diceAValue, diceBValue);
+            ExecuteLastRollAbilities(diceAValue, diceBValue, gameManager.GetHouseParticipant());
             gameManager.OnParticipantRolled(true, diceAValue, diceBValue);
         }
     }

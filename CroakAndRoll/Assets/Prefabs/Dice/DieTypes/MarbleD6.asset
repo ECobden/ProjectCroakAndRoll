@@ -13,12 +13,13 @@ MonoBehaviour:
   m_Name: MarbleD6
   m_EditorClassIdentifier: Assembly-CSharp::DieData
   dieName: Marble D6
-  description: A marble dice
+  description: Prestige allows an extra roll
   dieIcon: {fileID: 0}
   dieColor: {r: 1, g: 1, b: 1, a: 1}
   diePrefab: {fileID: 8436088037483572239, guid: 8c38f05ff2d0b0443921baee334cd4b5, type: 3}
   dieMaterialOverride: {fileID: 2100000, guid: 671d087eb0123fb46b34a2b6fea19a95, type: 2}
   faceValues: 010000000200000003000000040000000500000006000000
-  abilities: []
+  abilities:
+  - {fileID: 11400000, guid: d057845a301ef7840a20fcf2841355e2, type: 2}
   rarity: 1
   cost: 25

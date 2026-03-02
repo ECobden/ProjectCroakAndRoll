@@ -30,6 +30,7 @@ public abstract class DiceAbility : ScriptableObject
 /// <summary>
 /// Ability that allows swapping a die with opponent's die.
 /// </summary>
+[CreateAssetMenu(fileName = "SwapAbility_", menuName = "Croak and Roll/Abilities/Swap Ability", order = 1)]
 public class SwapAbility : DiceAbility
 {
     public override void Execute(Participant instigator, Participant opponent, int diceValue)
@@ -42,9 +43,10 @@ public class SwapAbility : DiceAbility
 /// <summary>
 /// Ability that grants money based on roll value.
 /// </summary>
+[CreateAssetMenu(fileName = "MoneyAbility_", menuName = "Croak and Roll/Abilities/Money Ability", order = 2)]
 public class MoneyAbility : DiceAbility
 {
-    [SerializeField] private int moneyPerPoint = 10;
+    [SerializeField] private int moneyPerPoint = 1;
 
     public override void Execute(Participant instigator, Participant opponent, int diceValue)
     {
@@ -57,6 +59,7 @@ public class MoneyAbility : DiceAbility
 /// <summary>
 /// Ability that grants an extra roll.
 /// </summary>
+[CreateAssetMenu(fileName = "ExtraRollAbility_", menuName = "Croak and Roll/Abilities/Extra Roll Ability", order = 3)]
 public class ExtraRollAbility : DiceAbility
 {
     public override void Execute(Participant instigator, Participant opponent, int diceValue)
@@ -69,6 +72,7 @@ public class ExtraRollAbility : DiceAbility
 /// <summary>
 /// Ability that steals points from opponent.
 /// </summary>
+[CreateAssetMenu(fileName = "StealPointsAbility_", menuName = "Croak and Roll/Abilities/Steal Points Ability", order = 4)]
 public class StealPointsAbility : DiceAbility
 {
     [SerializeField] private int pointsToSteal = 5;
@@ -83,6 +87,7 @@ public class StealPointsAbility : DiceAbility
 /// <summary>
 /// Ability that doubles the roll value.
 /// </summary>
+[CreateAssetMenu(fileName = "DoubleValueAbility_", menuName = "Croak and Roll/Abilities/Double Value Ability", order = 5)]
 public class DoubleValueAbility : DiceAbility
 {
     public override void Execute(Participant instigator, Participant opponent, int diceValue)

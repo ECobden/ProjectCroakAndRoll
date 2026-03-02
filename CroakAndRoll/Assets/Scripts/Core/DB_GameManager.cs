@@ -649,6 +649,16 @@ public class DB_GameManager : MonoBehaviour
             player.Stand();
     }
 
+    public Participant GetPlayerParticipant()
+    {
+        return player;
+    }
+
+    public Participant GetHouseParticipant()
+    {
+        return house;
+    }
+
     public void OnParticipantRolled(bool isPlayer, int diceAValue, int diceBValue)
     {
         if (currentState != GameState.PlayRound)

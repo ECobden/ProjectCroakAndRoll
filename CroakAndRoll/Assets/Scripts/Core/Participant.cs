@@ -344,5 +344,34 @@ public abstract class Participant : MonoBehaviour
         return new List<DieData>(lastConsumedRollDice);
     }
 
+    /// <summary>
+    /// Execute abilities for each die consumed in the most recent roll.
+    /// Die order maps to callback values: index 0 -> diceAValue, index 1 -> diceBValue.
+    /// </summary>
+    protected void ExecuteLastRollAbilities(int diceAValue, int diceBValue, Participant opponent)
+    {
+        if (lastConsumedRollDice == null || lastConsumedRollDice.Count == 0)
+            return;
+
+        for (int i = 0; i < lastConsumedRollDice.Count; i++)
+        {
+            DieData dieData = lastConsumedRollDice[i];
+            if (dieData == null || !dieData.HasAbilities())
+                continue;
+
+            int dieValue = i == 0 ? diceAValue : diceBValue;
+            List<DiceAbility> abilities = dieData.GetAbilities();
+
+            for (int abilityIndex = 0; abilityIndex < abilities.Count; abilityIndex++)
+            {
+                DiceAbility ability = abilities[abilityIndex];
+                if (ability == null)
+                    continue;
+
+                ability.Execute(this, opponent, dieValue);
+            }
+        }
+    }
+
     #endregion
 }

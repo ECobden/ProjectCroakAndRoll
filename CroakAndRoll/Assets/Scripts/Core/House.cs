@@ -129,6 +129,7 @@ public class House : Participant
         {
 
             RecordRoll(diceAValue, diceBValue);
+            ExecuteLastRollAbilities(diceAValue, diceBValue, gameManager.GetPlayerParticipant());
             gameManager.OnParticipantRolled(false, diceAValue, diceBValue);
         }
     }
