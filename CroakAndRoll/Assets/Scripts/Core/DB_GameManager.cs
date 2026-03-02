@@ -70,11 +70,13 @@ public class DB_GameManager : MonoBehaviour
     [Header("Managers")]
     [SerializeField] private DB_DiceManager diceManager;
     [SerializeField] private DB_UIManager uiManager;
+    [SerializeField] private ShopManager shopManager;
 
     [Header("Game Settings")]
     [SerializeField] private KeyCode restartKey = KeyCode.R;
     [SerializeField] private float newRoundDelay = 1.5f;
     [SerializeField] private int baseRoundWinReward = 100;
+    [SerializeField] private int gameSeed = 12345;
     
     #endregion
 
@@ -319,6 +321,26 @@ public class DB_GameManager : MonoBehaviour
         else
             Debug.Log("Player lost. Starting new round...");
         
+        // Open shop between rounds if available
+        if (shopManager != null)
+        {
+            string result = playerWonCurrentRound ? "Victory!" : "Defeat";
+            if (roundWasTie)
+                result = "Tie!";
+            shopManager.OpenShop(result, gameSeed + currentRound);
+        }
+        else
+        {
+            // No shop available, proceed directly to next round
+            StartCoroutine(StartNewRoundAfterDelay());
+        }
+    }
+
+    /// <summary>
+    /// Called by ShopManager when the player closes the shop.
+    /// </summary>
+    public void OnShopClosed()
+    {
         StartCoroutine(StartNewRoundAfterDelay());
     }
     

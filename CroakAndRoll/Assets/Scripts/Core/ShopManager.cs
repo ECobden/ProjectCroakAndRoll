@@ -13,6 +13,12 @@ public class ShopManager : MonoBehaviour
     [SerializeField] private GameObject shopPanel;
     [SerializeField] private TextMeshProUGUI playerMoneyDisplay;
     [SerializeField] private TextMeshProUGUI roundResultDisplay;
+    [SerializeField] private int numberOfShopOffers = 2;
+
+    [Header("Shop UI")]
+    [SerializeField] private GameObject shopItemPrefab;
+    [SerializeField] private Transform shopItemContainer;
+    [SerializeField] private UnityEngine.UI.Button continueButton;
 
     [Header("References")]
     [SerializeField] private DB_GameManager gameManager;
@@ -20,6 +26,8 @@ public class ShopManager : MonoBehaviour
 
     private bool isShopOpen = false;
     private DiceBag playerDiceBag;
+    private List<DieData> currentShopOffers = new List<DieData>();
+    private List<GameObject> instantiatedShopItems = new List<GameObject>();
 
     #region Lifecycle
 
@@ -32,6 +40,12 @@ public class ShopManager : MonoBehaviour
         {
             playerDiceBag = player.GetComponent<DiceBag>();
         }
+
+        // Set up continue button
+        if (continueButton != null)
+        {
+            continueButton.onClick.AddListener(CloseShop);
+        }
     }
 
     #endregion
@@ -41,7 +55,7 @@ public class ShopManager : MonoBehaviour
     /// <summary>
     /// Open the shop interface at the end of a round.
     /// </summary>
-    public void OpenShop(string roundResult)
+    public void OpenShop(string roundResult, int seed)
     {
         isShopOpen = true;
         
@@ -52,7 +66,7 @@ public class ShopManager : MonoBehaviour
             roundResultDisplay.text = roundResult;
 
         UpdateMoneyDisplay();
-        RefreshShopUI();
+        RefreshShopUI(seed);
 
         Debug.Log("Shop opened for player");
     }
@@ -67,12 +81,11 @@ public class ShopManager : MonoBehaviour
         if (shopPanel != null)
             shopPanel.SetActive(false);
 
-        // TODO: Notify GameManager to proceed to next round
-        // Uncomment when DB_GameManager has the OnShopClosed method:
-        // if (gameManager != null)
-        // {
-        //     gameManager.OnShopClosed();
-        // }
+        // Notify GameManager to proceed to next round
+        if (gameManager != null)
+        {
+            gameManager.OnShopClosed();
+        }
 
         Debug.Log("Shop closed - proceeding to next round");
     }
@@ -101,7 +114,7 @@ public class ShopManager : MonoBehaviour
         {
             playerDiceBag.AddDie(die);
             UpdateMoneyDisplay();
-            RefreshShopUI();
+            UpdateShopItemsAffordability();
             Debug.Log($"Player purchased {die.dieName} for {die.cost}");
             return true;
         }
@@ -117,10 +130,13 @@ public class ShopManager : MonoBehaviour
     /// </summary>
     public bool PurchaseUpgrade(string upgradeName, int cost)
     {
-        if (player == null || player.SpendMoney(cost))
+        if (player == null)
+            return false;
+
+        if (player.SpendMoney(cost))
         {
             UpdateMoneyDisplay();
-            RefreshShopUI();
+            UpdateShopItemsAffordability();
             Debug.Log($"Player purchased upgrade: {upgradeName}");
             return true;
         }
@@ -134,11 +150,47 @@ public class ShopManager : MonoBehaviour
     /// <summary>
     /// Refresh the shop UI to show available items and prices.
     /// </summary>
-    public void RefreshShopUI()
+    public void RefreshShopUI(int seed)
     {
-        // TODO: Update UI elements to show all available dice
-        // List prices, compare with player money, show affordability
-        Debug.Log($"Shop UI refreshed - {availableDice.Count} dice available");
+        // Clear previous shop items
+        ClearShopItems();
+
+        // Generate shop offers using weighted selection
+        currentShopOffers = SelectShopOffers(seed, numberOfShopOffers);
+
+        // Create UI elements for each offer
+        foreach (DieData die in currentShopOffers)
+        {
+            if (shopItemPrefab != null && shopItemContainer != null)
+            {
+                GameObject itemObj = Instantiate(shopItemPrefab, shopItemContainer);
+                instantiatedShopItems.Add(itemObj);
+
+                // Get the ShopItemUI component and set it up
+                ShopItemUI itemUI = itemObj.GetComponent<ShopItemUI>();
+                if (itemUI != null)
+                {
+                    bool canAfford = player != null && player.GetCurrentMoney() >= die.cost;
+                    itemUI.Setup(die, this, canAfford);
+                }
+            }
+        }
+
+        Debug.Log($"Shop UI refreshed - Showing {currentShopOffers.Count} offers");
+    }
+
+    /// <summary>
+    /// Clear all instantiated shop item UI elements.
+    /// </summary>
+    private void ClearShopItems()
+    {
+        foreach (GameObject item in instantiatedShopItems)
+        {
+            if (item != null)
+                Destroy(item);
+        }
+        instantiatedShopItems.Clear();
+        currentShopOffers.Clear();
     }
 
     /// <summary>
@@ -148,8 +200,80 @@ public class ShopManager : MonoBehaviour
     {
         if (player != null && playerMoneyDisplay != null)
         {
-            playerMoneyDisplay.text = $"Money: {player.GetCurrentMoney()}";
+            playerMoneyDisplay.text = $"${player.GetCurrentMoney()}";
         }
+    }
+
+    /// <summary>
+    /// Update affordability state of all shop items without regenerating offers.
+    /// </summary>
+    private void UpdateShopItemsAffordability()
+    {
+        if (player == null) return;
+
+        int currentMoney = player.GetCurrentMoney();
+        foreach (GameObject itemObj in instantiatedShopItems)
+        {
+            if (itemObj != null)
+            {
+                ShopItemUI itemUI = itemObj.GetComponent<ShopItemUI>();
+                if (itemUI != null)
+                {
+                    itemUI.UpdateAffordability(currentMoney);
+                }
+            }
+        }
+    }
+
+    #endregion
+
+    #region Shop Selection Logic
+
+    /// <summary>
+    /// Select shop offers using weighted random selection based on rarity.
+    /// Lower rarity = more common = higher selection weight.
+    /// </summary>
+    private List<DieData> SelectShopOffers(int seed, int count)
+    {
+        List<DieData> offers = new List<DieData>();
+
+        if (availableDice.Count == 0)
+        {
+            Debug.LogWarning("No dice available in shop inventory!");
+            return offers;
+        }
+
+        // Use seed for deterministic randomness
+        System.Random rng = new System.Random(seed);
+
+        // Calculate total weight (inverse of rarity)
+        float totalWeight = 0f;
+        foreach (DieData die in availableDice)
+        {
+            float weight = 1f / Mathf.Max(die.rarity, 1); // Prevent division by zero
+            totalWeight += weight;
+        }
+
+        // Select the specified number of offers
+        for (int i = 0; i < count && availableDice.Count > 0; i++)
+        {
+            float randomValue = (float)rng.NextDouble() * totalWeight;
+            float cumulative = 0f;
+
+            foreach (DieData die in availableDice)
+            {
+                float weight = 1f / Mathf.Max(die.rarity, 1);
+                cumulative += weight;
+
+                if (randomValue <= cumulative)
+                {
+                    offers.Add(die);
+                    break;
+                }
+            }
+        }
+
+        return offers;
     }
 
     #endregion
