@@ -15,6 +15,7 @@ public class DieData : ScriptableObject
     [SerializeField] public Sprite dieIcon;
     [SerializeField] public Color dieColor = Color.white;
     [SerializeField] public GameObject diePrefab; // Prefab to instantiate for this die type
+    [SerializeField] public Material dieMaterialOverride; // Optional runtime material override for spawned dice
 
     [Header("Face Values")]
     [SerializeField] public int[] faceValues = new int[6] { 1, 2, 3, 4, 5, 6 };

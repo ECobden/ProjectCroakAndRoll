@@ -162,6 +162,50 @@ public class DB_DiceController : MonoBehaviour
     public void SetDieData(DieData dieData)
     {
         currentDieData = dieData;
+
+        if (currentDieData != null && currentDieData.dieMaterialOverride != null)
+        {
+            ApplyMaterialOverride(currentDieData.dieMaterialOverride);
+        }
+    }
+
+    private void ApplyMaterialOverride(Material materialOverride)
+    {
+        if (materialOverride == null)
+            return;
+
+        Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer targetRenderer = renderers[i];
+            if (targetRenderer == null)
+                continue;
+
+            if (IsHighlightRenderer(targetRenderer))
+                continue;
+
+            Material[] currentMaterials = targetRenderer.materials;
+            for (int matIndex = 0; matIndex < currentMaterials.Length; matIndex++)
+            {
+                currentMaterials[matIndex] = materialOverride;
+            }
+
+            targetRenderer.materials = currentMaterials;
+        }
+    }
+
+    private bool IsHighlightRenderer(Renderer targetRenderer)
+    {
+        if (targetRenderer == null)
+            return false;
+
+        if (destroyHighlightObject != null && targetRenderer.transform.IsChildOf(destroyHighlightObject.transform))
+            return true;
+
+        if (swapHighlightObject != null && targetRenderer.transform.IsChildOf(swapHighlightObject.transform))
+            return true;
+
+        return false;
     }
 
     /// <summary>

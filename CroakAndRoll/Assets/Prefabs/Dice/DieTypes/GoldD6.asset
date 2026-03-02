@@ -10,15 +10,16 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 68108e5a7fc4e2d4d8ce03e3a56a55eb, type: 3}
-  m_Name: StandardD6
+  m_Name: GoldD6
   m_EditorClassIdentifier: Assembly-CSharp::DieData
-  dieName: D6
-  description: A standard six-sided die
+  dieName: Gold D6
+  description: A gold six-sided die that gives money equal to the amount rolled.
   dieIcon: {fileID: 0}
   dieColor: {r: 1, g: 1, b: 1, a: 1}
   diePrefab: {fileID: 8436088037483572239, guid: 8c38f05ff2d0b0443921baee334cd4b5, type: 3}
-  dieMaterialOverride: {fileID: 2100000, guid: 1e270d098688f704196d95ef669e63df, type: 2}
+  dieMaterialOverride: {fileID: 2100000, guid: 75e04092df37b45449ac6cf6cb54f64c, type: 2}
   faceValues: 010000000200000003000000040000000500000006000000
-  abilities: []
+  abilities:
+  - {fileID: 0}
   rarity: 1
   cost: 10
