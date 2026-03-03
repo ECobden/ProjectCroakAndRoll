@@ -1,6 +1,7 @@
 using UnityEngine;
 using System.Collections.Generic;
 using TMPro;
+using Unity.Cinemachine;
 
 /// <summary>
 /// Manages the shop interface and progression system.
@@ -9,20 +10,25 @@ using TMPro;
 public class ShopManager : MonoBehaviour
 {
     [Header("Shop Settings")]
-    [SerializeField] private List<DieData> availableDice = new List<DieData>();
-    [SerializeField] private GameObject shopPanel;
-    [SerializeField] private TextMeshProUGUI playerMoneyDisplay;
-    [SerializeField] private TextMeshProUGUI roundResultDisplay;
+    [SerializeField] private ShopInventoryData shopInventory;
     [SerializeField] private int numberOfShopOffers = 2;
+    [SerializeField] private int rerollCost = 50;
 
-    [Header("Shop UI")]
-    [SerializeField] private GameObject shopItemPrefab;
-    [SerializeField] private Transform shopItemContainer;
+    [Header("Shop Item Spawning")]
+    [SerializeField] private Transform[] shopItemSpawnPoints;
+    [SerializeField] private GameObject rerollObject;
     [SerializeField] private UnityEngine.UI.Button continueButton;
 
     [Header("References")]
     [SerializeField] private DB_GameManager gameManager;
     [SerializeField] private Player player;
+    [SerializeField] private ShopMachineController shopMachineController;
+
+    [Header("Camera Settings")]
+    [SerializeField] private CinemachineCamera shopCamera;
+    [SerializeField] private CinemachineCamera gameplayCamera;
+    [SerializeField] private int shopCameraPriority = 10;
+    [SerializeField] private int gameplayCameraPriority = 10;
 
     private bool isShopOpen = false;
     private DiceBag playerDiceBag;
@@ -33,9 +39,6 @@ public class ShopManager : MonoBehaviour
 
     private void Start()
     {
-        if (shopPanel != null)
-            shopPanel.SetActive(false);
-
         if (player != null)
         {
             playerDiceBag = player.GetComponent<DiceBag>();
@@ -53,20 +56,22 @@ public class ShopManager : MonoBehaviour
     #region Shop Control
 
     /// <summary>
-    /// Open the shop interface at the end of a round.
+    /// Open the shop at the end of a round.
     /// </summary>
-    public void OpenShop(string roundResult, int seed)
+    public void OpenShop(int seed)
     {
         isShopOpen = true;
         
-        if (shopPanel != null)
-            shopPanel.SetActive(true);
+        // Show shop machine
+        if (shopMachineController != null)
+        {
+            shopMachineController.ShowShop();
+        }
 
-        if (roundResultDisplay != null)
-            roundResultDisplay.text = roundResult;
-
-        UpdateMoneyDisplay();
         RefreshShopUI(seed);
+
+        // Switch to shop camera
+        SwitchToShopCamera();
 
         Debug.Log("Shop opened for player");
     }
@@ -78,8 +83,17 @@ public class ShopManager : MonoBehaviour
     {
         isShopOpen = false;
 
-        if (shopPanel != null)
-            shopPanel.SetActive(false);
+        // Hide shop machine
+        if (shopMachineController != null)
+        {
+            shopMachineController.HideShop();
+        }
+
+        // Clear shop items from scene
+        ClearShopItems();
+
+        // Switch back to gameplay camera
+        SwitchToGameplayCamera();
 
         // Notify GameManager to proceed to next round
         if (gameManager != null)
@@ -100,6 +114,42 @@ public class ShopManager : MonoBehaviour
 
     #endregion
 
+    #region Camera Control
+
+    /// <summary>
+    /// Switch to the shop camera by adjusting priorities.
+    /// </summary>
+    private void SwitchToShopCamera()
+    {
+        if (shopCamera != null)
+        {
+            shopCamera.Priority = shopCameraPriority;
+        }
+
+        if (gameplayCamera != null)
+        {
+            gameplayCamera.Priority = 0;
+        }
+    }
+
+    /// <summary>
+    /// Switch to the gameplay camera by adjusting priorities.
+    /// </summary>
+    private void SwitchToGameplayCamera()
+    {
+        if (gameplayCamera != null)
+        {
+            gameplayCamera.Priority = gameplayCameraPriority;
+        }
+
+        if (shopCamera != null)
+        {
+            shopCamera.Priority = 0;
+        }
+    }
+
+    #endregion
+
     #region Purchasing
 
     /// <summary>
@@ -113,8 +163,6 @@ public class ShopManager : MonoBehaviour
         if (player.SpendMoney(die.cost))
         {
             playerDiceBag.AddDie(die);
-            UpdateMoneyDisplay();
-            UpdateShopItemsAffordability();
             Debug.Log($"Player purchased {die.dieName} for {die.cost}");
             return true;
         }
@@ -135,8 +183,6 @@ public class ShopManager : MonoBehaviour
 
         if (player.SpendMoney(cost))
         {
-            UpdateMoneyDisplay();
-            UpdateShopItemsAffordability();
             Debug.Log($"Player purchased upgrade: {upgradeName}");
             return true;
         }
@@ -148,7 +194,7 @@ public class ShopManager : MonoBehaviour
     #region UI Updates
 
     /// <summary>
-    /// Refresh the shop UI to show available items and prices.
+    /// Refresh the shop to show available items.
     /// </summary>
     public void RefreshShopUI(int seed)
     {
@@ -158,29 +204,70 @@ public class ShopManager : MonoBehaviour
         // Generate shop offers using weighted selection
         currentShopOffers = SelectShopOffers(seed, numberOfShopOffers);
 
-        // Create UI elements for each offer
-        foreach (DieData die in currentShopOffers)
+        if (shopItemSpawnPoints == null || shopItemSpawnPoints.Length == 0)
         {
-            if (shopItemPrefab != null && shopItemContainer != null)
-            {
-                GameObject itemObj = Instantiate(shopItemPrefab, shopItemContainer);
-                instantiatedShopItems.Add(itemObj);
+            Debug.LogWarning("No spawn points assigned to ShopManager!");
+            return;
+        }
 
-                // Get the ShopItemUI component and set it up
-                ShopItemUI itemUI = itemObj.GetComponent<ShopItemUI>();
-                if (itemUI != null)
-                {
-                    bool canAfford = player != null && player.GetCurrentMoney() >= die.cost;
-                    itemUI.Setup(die, this, canAfford);
-                }
+        // Spawn dice prefabs at designated spawn points
+        for (int i = 0; i < currentShopOffers.Count && i < shopItemSpawnPoints.Length; i++)
+        {
+            DieData die = currentShopOffers[i];
+            Transform spawnPoint = shopItemSpawnPoints[i];
+
+            if (die != null && die.diePrefab != null && spawnPoint != null)
+            {
+                GameObject diceObj = Instantiate(die.diePrefab, spawnPoint.position, spawnPoint.rotation);
+                instantiatedShopItems.Add(diceObj);
+
+                // Optionally add a component to track which DieData this represents
+                // This would allow the purchase system to identify which die was selected
             }
         }
 
-        Debug.Log($"Shop UI refreshed - Showing {currentShopOffers.Count} offers");
+        Debug.Log($"Shop refreshed - Showing {currentShopOffers.Count} offers");
     }
 
     /// <summary>
-    /// Clear all instantiated shop item UI elements.
+    /// Reroll the shop offers for a cost.
+    /// </summary>
+    public bool RerollShop()
+    {
+        if (player == null)
+            return false;
+
+        if (!player.SpendMoney(rerollCost))
+        {
+            Debug.LogWarning($"Cannot afford shop reroll (costs {rerollCost})");
+            return false;
+        }
+
+        // Generate new seed based on current time
+        int newSeed = System.DateTime.Now.Millisecond + UnityEngine.Random.Range(0, 10000);
+        
+        // Animate reroll lever
+        if (shopMachineController != null)
+        {
+            shopMachineController.RotateRerollLever();
+        }
+
+        RefreshShopUI(newSeed);
+        
+        Debug.Log($"Shop rerolled for {rerollCost}");
+        return true;
+    }
+
+    /// <summary>
+    /// Get the cost to reroll the shop.
+    /// </summary>
+    public int GetRerollCost()
+    {
+        return rerollCost;
+    }
+
+    /// <summary>
+    /// Clear all instantiated shop dice from the scene.
     /// </summary>
     private void ClearShopItems()
     {
@@ -191,38 +278,6 @@ public class ShopManager : MonoBehaviour
         }
         instantiatedShopItems.Clear();
         currentShopOffers.Clear();
-    }
-
-    /// <summary>
-    /// Update the player money display.
-    /// </summary>
-    private void UpdateMoneyDisplay()
-    {
-        if (player != null && playerMoneyDisplay != null)
-        {
-            playerMoneyDisplay.text = $"${player.GetCurrentMoney()}";
-        }
-    }
-
-    /// <summary>
-    /// Update affordability state of all shop items without regenerating offers.
-    /// </summary>
-    private void UpdateShopItemsAffordability()
-    {
-        if (player == null) return;
-
-        int currentMoney = player.GetCurrentMoney();
-        foreach (GameObject itemObj in instantiatedShopItems)
-        {
-            if (itemObj != null)
-            {
-                ShopItemUI itemUI = itemObj.GetComponent<ShopItemUI>();
-                if (itemUI != null)
-                {
-                    itemUI.UpdateAffordability(currentMoney);
-                }
-            }
-        }
     }
 
     #endregion
@@ -237,11 +292,13 @@ public class ShopManager : MonoBehaviour
     {
         List<DieData> offers = new List<DieData>();
 
-        if (availableDice.Count == 0)
+        if (shopInventory == null || shopInventory.GetDiceCount() == 0)
         {
             Debug.LogWarning("No dice available in shop inventory!");
             return offers;
         }
+
+        List<DieData> availableDice = shopInventory.GetAvailableDice();
 
         // Use seed for deterministic randomness
         System.Random rng = new System.Random(seed);
@@ -285,30 +342,27 @@ public class ShopManager : MonoBehaviour
     /// </summary>
     public List<DieData> GetAvailableDice()
     {
-        return new List<DieData>(availableDice);
+        if (shopInventory == null)
+            return new List<DieData>();
+        
+        return new List<DieData>(shopInventory.GetAvailableDice());
     }
 
     /// <summary>
-    /// Add a new die to the shop inventory.
+    /// Get the current shop inventory data.
     /// </summary>
-    public void AddDieToShop(DieData die)
+    public ShopInventoryData GetShopInventory()
     {
-        if (die != null && !availableDice.Contains(die))
-        {
-            availableDice.Add(die);
-            Debug.Log($"{die.dieName} added to shop");
-        }
+        return shopInventory;
     }
 
     /// <summary>
-    /// Remove a die from the shop inventory (sold out).
+    /// Set a new shop inventory.
     /// </summary>
-    public void RemoveDieFromShop(DieData die)
+    public void SetShopInventory(ShopInventoryData newInventory)
     {
-        if (availableDice.Remove(die))
-        {
-            Debug.Log($"{die.dieName} removed from shop");
-        }
+        shopInventory = newInventory;
+        Debug.Log($"Shop inventory updated");
     }
 
     #endregion

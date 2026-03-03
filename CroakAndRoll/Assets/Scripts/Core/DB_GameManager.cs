@@ -91,6 +91,7 @@ public class DB_GameManager : MonoBehaviour
     private bool playerWonCurrentRound = false;
     private bool roundWasTie = false;
     private bool buttonsInitialized = false;
+    private int pendingRoundReward = 0;
     
     // Rule decision system
     private bool isWaitingForPlayerRuleDecision = false;
@@ -302,9 +303,9 @@ public class DB_GameManager : MonoBehaviour
     private void EndRound(bool playerWon)
     {
         playerWonCurrentRound = playerWon;
+        roundWasTie = false;
 
-        if (playerWon && player != null && baseRoundWinReward > 0)
-            player.AddMoney(baseRoundWinReward);
+        pendingRoundReward = playerWon && baseRoundWinReward > 0 ? baseRoundWinReward : 0;
         
         if (uiManager != null)
             uiManager.ClearRollScoreText();
@@ -320,14 +321,26 @@ public class DB_GameManager : MonoBehaviour
             Debug.Log("Player won! Starting new round...");
         else
             Debug.Log("Player lost. Starting new round...");
+
+        StartCoroutine(HandleRoundOverSequence());
+    }
+
+    private IEnumerator HandleRoundOverSequence()
+    {
+        if (pendingRoundReward > 0 && player != null)
+        {
+            player.AddMoney(pendingRoundReward);
+            pendingRoundReward = 0;
+            yield return null;
+        }
+
+        if (diceManager != null)
+            diceManager.ClearScoredDice();
         
         // Open shop between rounds if available
         if (shopManager != null)
         {
-            string result = playerWonCurrentRound ? "Victory!" : "Defeat";
-            if (roundWasTie)
-                result = "Tie!";
-            shopManager.OpenShop(result, gameSeed + currentRound);
+            shopManager.OpenShop(gameSeed + currentRound);
         }
         else
         {
@@ -609,6 +622,7 @@ public class DB_GameManager : MonoBehaviour
     {
         playerWonCurrentRound = false;
         roundWasTie = true;
+        pendingRoundReward = 0;
 
         if (uiManager != null)
             uiManager.ClearRollScoreText();
