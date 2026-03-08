@@ -156,6 +156,9 @@ public class UI_LifeCardsView : MonoBehaviour
         if (card == null)
             yield break;
 
+        if (PostProcessingEffectsController.Instance != null)
+            PostProcessingEffectsController.Instance.PulseChromaticAberration();
+
         // Detach so card animation is unaffected by anchor movement.
         card.transform.SetParent(null);
 
