@@ -238,7 +238,7 @@ public class DB_GameManager : MonoBehaviour
         UpdateLivesUI();
     }
 
-    private void UpdateLivesUI()
+    public void UpdateLivesUI()
     {
         if (uiManager == null)
             return;

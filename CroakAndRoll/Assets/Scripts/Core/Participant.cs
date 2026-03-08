@@ -197,6 +197,25 @@ public abstract class Participant : MonoBehaviour
         RestoreFullLives();
     }
 
+    /// <summary>
+    /// Add lives to current amount (for debug/powerups).
+    /// </summary>
+    public void AddLives(int amount)
+    {
+        currentLives += amount;
+        currentLives = Mathf.Max(0, currentLives);
+        Debug.Log($"{gameObject.name} gained {amount} lives. Lives: {currentLives}");
+    }
+
+    /// <summary>
+    /// Set current lives directly (for debug purposes).
+    /// </summary>
+    public void SetCurrentLives(int lives)
+    {
+        currentLives = Mathf.Max(0, lives);
+        Debug.Log($"{gameObject.name} lives set to {currentLives}");
+    }
+
     #endregion
 
     #region Turn State
