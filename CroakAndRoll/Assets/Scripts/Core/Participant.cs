@@ -13,6 +13,10 @@ public abstract class Participant : MonoBehaviour
     [SerializeField] protected int startingMoney = 1000;
     protected int currentMoney;
 
+    [Header("Lives System")]
+    [SerializeField] protected int startingLives = 3;
+    protected int currentLives;
+
     [Header("Dice Collection")]
     [SerializeField] protected DiceBag diceBag;
 
@@ -48,6 +52,7 @@ public abstract class Participant : MonoBehaviour
     protected virtual void Start()
     {
         currentMoney = startingMoney;
+        currentLives = Mathf.Max(1, startingLives);
     }
 
     #endregion
@@ -133,6 +138,63 @@ public abstract class Participant : MonoBehaviour
         if (diceBag != null)
             diceBag.SetDisplayDiceOverride(null);
         Debug.Log($"{gameObject.name} reset for new round");
+    }
+
+    #endregion
+
+    #region Lives System
+
+    /// <summary>
+    /// Get current lives for this participant.
+    /// </summary>
+    public int GetCurrentLives()
+    {
+        return currentLives;
+    }
+
+    /// <summary>
+    /// Get configured max lives for this participant.
+    /// </summary>
+    public int GetStartingLives()
+    {
+        return startingLives;
+    }
+
+    /// <summary>
+    /// Decrement one life and return true if participant is now out of lives.
+    /// </summary>
+    public bool LoseLife()
+    {
+        currentLives = Mathf.Max(0, currentLives - 1);
+        Debug.Log($"{gameObject.name} lost a life. Lives remaining: {currentLives}");
+        return currentLives <= 0;
+    }
+
+    /// <summary>
+    /// Restore current lives to configured maximum.
+    /// </summary>
+    public void RestoreFullLives()
+    {
+        currentLives = Mathf.Max(1, startingLives);
+        Debug.Log($"{gameObject.name} lives restored to {currentLives}");
+    }
+
+    /// <summary>
+    /// Set maximum lives and optionally sync current lives to that value.
+    /// </summary>
+    public void SetStartingLives(int lives, bool refillCurrentLives)
+    {
+        startingLives = Mathf.Max(1, lives);
+        if (refillCurrentLives)
+            currentLives = startingLives;
+    }
+
+    /// <summary>
+    /// Reset lives to configured starting amount.
+    /// </summary>
+    public void ResetLives()
+    {
+        RestoreFullLives();
     }
 
     #endregion

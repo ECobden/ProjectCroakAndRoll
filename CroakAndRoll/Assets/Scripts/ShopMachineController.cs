@@ -28,6 +28,7 @@ public class ShopMachineController : MonoBehaviour
     private bool isMoving = false;
     private float moveProgress = 0f;
     private bool isOnScreen = false;
+    private RerollLeverController leverController;
 
     private void Start()
     {
@@ -36,6 +37,17 @@ public class ShopMachineController : MonoBehaviour
         if (rerollLever != null)
         {
             leverInitialRotation = rerollLever.transform.localRotation;
+            
+            // Set up lever click handler
+            leverController = rerollLever.GetComponent<RerollLeverController>();
+            if (leverController != null)
+            {
+                leverController.onLeverClicked.AddListener(RotateRerollLever);
+            }
+            else
+            {
+                Debug.LogWarning("RerollLeverController component not found on reroll lever GameObject. Add it to enable clicking.");
+            }
         }
 
         // Start off screen
@@ -43,6 +55,15 @@ public class ShopMachineController : MonoBehaviour
         {
             transform.position = offScreenPosition.position;
             transform.rotation = offScreenPosition.rotation;
+        }
+    }
+
+    private void OnDestroy()
+    {
+        // Clean up listener
+        if (leverController != null)
+        {
+            leverController.onLeverClicked.RemoveListener(RotateRerollLever);
         }
     }
 
@@ -131,6 +152,12 @@ public class ShopMachineController : MonoBehaviour
     /// </summary>
     private System.Collections.IEnumerator AnimateRerollLever()
     {
+        // Disable clicking during animation
+        if (leverController != null)
+        {
+            leverController.SetClickable(false);
+        }
+
         Quaternion startRotation = rerollLever.transform.localRotation;
         Quaternion targetRotation = leverInitialRotation * Quaternion.AngleAxis(leverRotationAngle, leverRotationAxis);
         
@@ -158,6 +185,12 @@ public class ShopMachineController : MonoBehaviour
         }
 
         rerollLever.transform.localRotation = leverInitialRotation;
+
+        // Re-enable clicking after animation
+        if (leverController != null)
+        {
+            leverController.SetClickable(true);
+        }
     }
 
     /// <summary>

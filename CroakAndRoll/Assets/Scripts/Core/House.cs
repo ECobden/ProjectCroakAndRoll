@@ -163,6 +163,26 @@ public class House : Participant
     {
         return currentStandValue;
     }
+
+    /// <summary>
+    /// Apply a profile to configure this house opponent for a new encounter.
+    /// </summary>
+    public void ApplyOpponentProfile(OpponentProfileData profile)
+    {
+        if (profile == null)
+            return;
+
+        SetStartingLives(profile.lives, true);
+        defaultStandValue = Mathf.Max(1, profile.standValue);
+        currentStandValue = defaultStandValue;
+        cautiousness = Mathf.Clamp01(profile.cautiousness);
+        safeThreshold = Mathf.Max(1, profile.safeThreshold);
+
+        if (diceBag != null)
+            diceBag.SetDiceCollection(profile.startingDice);
+
+        Debug.Log($"[HOUSE] Applied opponent profile: {profile.opponentName}");
+    }
     
     #region AI Decision Making
     

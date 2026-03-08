@@ -77,6 +77,10 @@ public class DB_GameManager : MonoBehaviour
     [SerializeField] private float newRoundDelay = 1.5f;
     [SerializeField] private int baseRoundWinReward = 100;
     [SerializeField] private int gameSeed = 12345;
+
+    [Header("Opponent Progression")]
+    [SerializeField] private List<OpponentProfileData> opponentProfiles = new List<OpponentProfileData>();
+    [SerializeField] private bool loopOpponentProfiles = true;
     
     #endregion
 
@@ -91,7 +95,9 @@ public class DB_GameManager : MonoBehaviour
     private bool playerWonCurrentRound = false;
     private bool roundWasTie = false;
     private bool buttonsInitialized = false;
-    private int pendingRoundReward = 0;
+    private bool pendingAdvanceToNextOpponent = false;
+    private int currentOpponentIndex = 0;
+    private string currentOpponentName = "House";
     
     // Rule decision system
     private bool isWaitingForPlayerRuleDecision = false;
@@ -118,6 +124,7 @@ public class DB_GameManager : MonoBehaviour
         // One-time initialization only
         InitializeDice();
         InitializeUI();
+        InitializeEncounterProgression();
         
         // Start first round (round counter starts at 1)
         StartRoundOne();
@@ -154,6 +161,91 @@ public class DB_GameManager : MonoBehaviour
     {
         if (uiManager != null)
             uiManager.Initialize(RestartGame);
+    }
+
+    private void InitializeEncounterProgression()
+    {
+        currentOpponentIndex = 0;
+        pendingAdvanceToNextOpponent = false;
+
+        if (player != null)
+            player.ResetLives();
+
+        ApplyCurrentOpponentProfile();
+        UpdateLivesUI();
+    }
+
+    private void ApplyCurrentOpponentProfile()
+    {
+        if (house == null)
+            return;
+
+        OpponentProfileData profile = GetOpponentProfile(currentOpponentIndex);
+        if (profile != null)
+        {
+            house.ApplyOpponentProfile(profile);
+            currentOpponentName = string.IsNullOrWhiteSpace(profile.opponentName) ? "House" : profile.opponentName;
+        }
+        else
+        {
+            house.ResetLives();
+            currentOpponentName = "House";
+
+            if (opponentProfiles != null && opponentProfiles.Count > 0)
+                Debug.LogWarning("Opponent profile list has entries, but selected profile is null. Using fallback house setup.");
+        }
+
+        if (uiManager != null)
+            uiManager.UpdateOpponentName(currentOpponentName);
+    }
+
+    private OpponentProfileData GetOpponentProfile(int index)
+    {
+        if (opponentProfiles == null || opponentProfiles.Count == 0)
+            return null;
+
+        if (index < 0 || index >= opponentProfiles.Count)
+            return null;
+
+        return opponentProfiles[index];
+    }
+
+    private void AdvanceToNextOpponent()
+    {
+        if (opponentProfiles == null || opponentProfiles.Count == 0)
+        {
+            if (house != null)
+                house.ResetLives();
+
+            currentOpponentName = "House";
+            if (uiManager != null)
+                uiManager.UpdateOpponentName(currentOpponentName);
+
+            return;
+        }
+
+        currentOpponentIndex++;
+
+        if (currentOpponentIndex >= opponentProfiles.Count)
+        {
+            if (loopOpponentProfiles)
+                currentOpponentIndex = 0;
+            else
+                currentOpponentIndex = opponentProfiles.Count - 1;
+        }
+
+        ApplyCurrentOpponentProfile();
+        UpdateLivesUI();
+    }
+
+    private void UpdateLivesUI()
+    {
+        if (uiManager == null)
+            return;
+
+        int playerLives = player != null ? player.GetCurrentLives() : 0;
+        int houseLives = house != null ? house.GetCurrentLives() : 0;
+        uiManager.UpdateLivesDisplay(playerLives, houseLives);
     }
     
     /// <summary>
@@ -304,8 +396,6 @@ public class DB_GameManager : MonoBehaviour
     {
         playerWonCurrentRound = playerWon;
         roundWasTie = false;
-
-        pendingRoundReward = playerWon && baseRoundWinReward > 0 ? baseRoundWinReward : 0;
         
         if (uiManager != null)
             uiManager.ClearRollScoreText();
@@ -327,26 +417,58 @@ public class DB_GameManager : MonoBehaviour
 
     private IEnumerator HandleRoundOverSequence()
     {
-        if (pendingRoundReward > 0 && player != null)
+        if (!roundWasTie)
         {
-            player.AddMoney(pendingRoundReward);
-            pendingRoundReward = 0;
-            yield return null;
+            if (playerWonCurrentRound)
+            {
+                if (house != null)
+                    house.LoseLife();
+            }
+            else
+            {
+                if (player != null)
+                    player.LoseLife();
+            }
+
+            UpdateLivesUI();
         }
 
         if (diceManager != null)
             diceManager.ClearScoredDice();
-        
-        // Open shop between rounds if available
-        if (shopManager != null)
+
+        bool playerOutOfLives = player != null && player.GetCurrentLives() <= 0;
+        bool houseOutOfLives = house != null && house.GetCurrentLives() <= 0;
+
+        if (playerOutOfLives)
         {
-            shopManager.OpenShop(gameSeed + currentRound);
+            TransitionToState(GameState.GameOver);
+            yield break;
         }
-        else
+
+        if (houseOutOfLives)
         {
-            // No shop available, proceed directly to next round
+            if (player != null)
+            {
+                player.RestoreFullLives();
+                if (baseRoundWinReward > 0)
+                    player.AddMoney(baseRoundWinReward);
+            }
+
+            UpdateLivesUI();
+            pendingAdvanceToNextOpponent = true;
+
+            if (shopManager != null)
+            {
+                shopManager.OpenShop(gameSeed + currentRound);
+                yield break;
+            }
+
+            AdvanceToNextOpponent();
             StartCoroutine(StartNewRoundAfterDelay());
+            yield break;
         }
+        
+        StartCoroutine(StartNewRoundAfterDelay());
     }
 
     /// <summary>
@@ -354,6 +476,12 @@ public class DB_GameManager : MonoBehaviour
     /// </summary>
     public void OnShopClosed()
     {
+        if (pendingAdvanceToNextOpponent)
+        {
+            pendingAdvanceToNextOpponent = false;
+            AdvanceToNextOpponent();
+        }
+
         StartCoroutine(StartNewRoundAfterDelay());
     }
     
@@ -390,6 +518,7 @@ public class DB_GameManager : MonoBehaviour
         
         // 3. Update round UI
         UpdateRoundUI();
+        UpdateLivesUI();
         
         // 4. Prepare UI for new round
         PrepareRoundUI();
@@ -622,7 +751,6 @@ public class DB_GameManager : MonoBehaviour
     {
         playerWonCurrentRound = false;
         roundWasTie = true;
-        pendingRoundReward = 0;
 
         if (uiManager != null)
             uiManager.ClearRollScoreText();
@@ -763,6 +891,8 @@ public class DB_GameManager : MonoBehaviour
     public void RestartGame()
     {
         Debug.Log("=== Restarting Game ===");
+
+        StopAllCoroutines();
         
         // Reset game-level state
         ResetGameState();
@@ -772,7 +902,9 @@ public class DB_GameManager : MonoBehaviour
         
         // Reset round counter to 1
         currentRound = 1;
+        InitializeEncounterProgression();
         UpdateRoundUI();
+        StartRoundOne();
     }
 
     private void ResetGameState()
@@ -794,11 +926,13 @@ public class DB_GameManager : MonoBehaviour
         if (player != null)
         {
             player.ResetMoney();
+            player.ResetLives();
         }
 
         if (house != null)
         {
             house.ResetMoney();
+            house.ResetLives();
             house.ResetTurnValue();
         }
     }

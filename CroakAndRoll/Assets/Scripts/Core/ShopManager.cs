@@ -34,6 +34,8 @@ public class ShopManager : MonoBehaviour
     private DiceBag playerDiceBag;
     private List<DieData> currentShopOffers = new List<DieData>();
     private List<GameObject> instantiatedShopItems = new List<GameObject>();
+    private Dictionary<DB_DiceController, DieData> shopDiceLookup = new Dictionary<DB_DiceController, DieData>();
+    private DB_DiceController selectedShopDice;
 
     #region Lifecycle
 
@@ -174,6 +176,47 @@ public class ShopManager : MonoBehaviour
     }
 
     /// <summary>
+    /// Purchase the currently selected shop die.
+    /// Intended for wiring to the shop Buy button.
+    /// </summary>
+    public void BuyItem()
+    {
+        if (!isShopOpen)
+        {
+            Debug.LogWarning("Cannot buy item: shop is not open.");
+            return;
+        }
+
+        if (selectedShopDice == null)
+        {
+            Debug.LogWarning("Cannot buy item: no shop die selected.");
+            return;
+        }
+
+        if (!shopDiceLookup.TryGetValue(selectedShopDice, out DieData selectedDie) || selectedDie == null)
+        {
+            Debug.LogWarning("Cannot buy item: selected die is invalid.");
+            return;
+        }
+
+        if (!PurchaseDie(selectedDie))
+            return;
+
+        if (selectedShopDice != null)
+        {
+            selectedShopDice.RemoveHighlight();
+            GameObject purchasedObject = selectedShopDice.gameObject;
+            instantiatedShopItems.Remove(purchasedObject);
+            currentShopOffers.Remove(selectedDie);
+            shopDiceLookup.Remove(selectedShopDice);
+            selectedShopDice = null;
+
+            if (purchasedObject != null)
+                Destroy(purchasedObject);
+        }
+    }
+
+    /// <summary>
     /// Purchase an upgrade (e.g., extra inventory slot).
     /// </summary>
     public bool PurchaseUpgrade(string upgradeName, int cost)
@@ -210,6 +253,19 @@ public class ShopManager : MonoBehaviour
             return;
         }
 
+        // Delayed spawning to allow shop machine animations to play
+        StartCoroutine(SpawnShopItemsDelayed());
+    }
+
+    /// <summary>
+    /// Spawn shop items with a delay to allow animations to play.
+    /// </summary>
+    private System.Collections.IEnumerator SpawnShopItemsDelayed()
+    {
+        // 1 second delay to allow shop machine animations to complete
+        Debug.Log("Delaying shop item spawn by 1 second to allow shop machine animations to play");
+        yield return new UnityEngine.WaitForSeconds(1f);
+
         // Spawn dice prefabs at designated spawn points
         for (int i = 0; i < currentShopOffers.Count && i < shopItemSpawnPoints.Length; i++)
         {
@@ -221,8 +277,13 @@ public class ShopManager : MonoBehaviour
                 GameObject diceObj = Instantiate(die.diePrefab, spawnPoint.position, spawnPoint.rotation);
                 instantiatedShopItems.Add(diceObj);
 
-                // Optionally add a component to track which DieData this represents
-                // This would allow the purchase system to identify which die was selected
+                DB_DiceController diceController = diceObj.GetComponent<DB_DiceController>();
+                if (diceController != null)
+                {
+                    diceController.SetDieData(die);
+                    diceController.SetClickable(true, OnShopDiceClicked);
+                    shopDiceLookup[diceController] = die;
+                }
             }
         }
 
@@ -271,13 +332,33 @@ public class ShopManager : MonoBehaviour
     /// </summary>
     private void ClearShopItems()
     {
+        if (selectedShopDice != null)
+            selectedShopDice.RemoveHighlight();
+
         foreach (GameObject item in instantiatedShopItems)
         {
             if (item != null)
                 Destroy(item);
         }
+
+        selectedShopDice = null;
         instantiatedShopItems.Clear();
         currentShopOffers.Clear();
+        shopDiceLookup.Clear();
+    }
+
+    private void OnShopDiceClicked(DB_DiceController clickedDice)
+    {
+        if (clickedDice == null)
+            return;
+
+        clickedDice.ShowDiceInfo();
+
+        if (selectedShopDice != null && selectedShopDice != clickedDice)
+            selectedShopDice.RemoveHighlight();
+
+        selectedShopDice = clickedDice;
+        selectedShopDice.Highlight(Color.blue);
     }
 
     #endregion

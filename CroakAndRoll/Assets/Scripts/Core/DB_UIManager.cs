@@ -34,6 +34,15 @@ public class DB_UIManager : MonoBehaviour
     [SerializeField] private float deleteSpeed = 0.05f;
     [SerializeField] private float typeSpeed = 0.05f;
 
+    [Header("Encounter UI - Text")]
+    [SerializeField] private TextMeshProUGUI playerLivesText;
+    [SerializeField] private TextMeshProUGUI houseLivesText;
+    [SerializeField] private TextMeshProUGUI opponentNameText;
+
+    [Header("Encounter UI - Life Cards")]
+    [SerializeField] private UI_LifeCardsView playerLivesCardView;
+    [SerializeField] private UI_LifeCardsView houseLivesCardView;
+
     [Header("Dice Info Display")]
     [SerializeField] private DiceInfoPanel diceInfoPanel;
 
@@ -170,31 +179,14 @@ public class DB_UIManager : MonoBehaviour
     
     public IEnumerator ShowGameplayButtonsDirectly(Action onStandAction, Action onRollAction)
     {
-        // Show button panel
         ShowButtonPanel();
-        
-        // Update button texts
-        if (buttonLeft != null)
-            buttonLeft.SetButtonText("Stand");
-        if (buttonRight != null)
-            buttonRight.SetButtonText("Roll");
 
-        // Set button actions for gameplay
-        if (buttonLeft != null)
-            buttonLeft.SetButtonAction(onStandAction);
-        if (buttonRight != null)
-            buttonRight.SetButtonAction(onRollAction);
-
-        // Activate buttons
-        if (buttonLeft != null)
-            buttonLeft.ActivateButton();
-        if (buttonRight != null)
-            buttonRight.ActivateButton();
+        ConfigureGameplayButtons(onStandAction, onRollAction);
+        ApplyToBothButtons(button => button.ActivateButton());
 
         // Stand button should start disabled (player hasn't rolled yet)
         yield return new WaitForSeconds(0.6f); // Wait for activation animation
-        if (buttonLeft != null)
-            buttonLeft.DisableButton();
+        ApplyToLeftButton(button => button.DisableButton());
     }
 
     #endregion
@@ -203,36 +195,60 @@ public class DB_UIManager : MonoBehaviour
 
     public void DisableGameplayButtons()
     {
-        if (buttonLeft != null)
-            buttonLeft.DisableButton();
-        if (buttonRight != null)
-            buttonRight.DisableButton();
+        ApplyToBothButtons(button => button.DisableButton());
     }
 
     public void EnableStandButton()
     {
-        if (buttonLeft != null)
-            buttonLeft.EnableButton();
+        ApplyToLeftButton(button => button.EnableButton());
     }
 
     public void EnableRollButton()
     {
-        if (buttonRight != null)
-            buttonRight.EnableButton();
+        ApplyToRightButton(button => button.EnableButton());
     }
 
     public void SetRollButtonText(string text)
     {
-        if (buttonRight != null)
-            buttonRight.SetButtonText(text);
+        ApplyToRightButton(button => button.SetButtonText(text));
     }
 
     public void DeactivateButtons()
     {
+        ApplyToBothButtons(button => button.DeactivateButton());
+    }
+
+    private void ConfigureGameplayButtons(Action onStandAction, Action onRollAction)
+    {
+        ApplyToLeftButton(button =>
+        {
+            button.SetButtonText("Stand");
+            button.SetButtonAction(onStandAction);
+        });
+
+        ApplyToRightButton(button =>
+        {
+            button.SetButtonText("Roll");
+            button.SetButtonAction(onRollAction);
+        });
+    }
+
+    private void ApplyToBothButtons(Action<UI_ButtonController> callback)
+    {
+        ApplyToLeftButton(callback);
+        ApplyToRightButton(callback);
+    }
+
+    private void ApplyToLeftButton(Action<UI_ButtonController> callback)
+    {
         if (buttonLeft != null)
-            buttonLeft.DeactivateButton();
+            callback(buttonLeft);
+    }
+
+    private void ApplyToRightButton(Action<UI_ButtonController> callback)
+    {
         if (buttonRight != null)
-            buttonRight.DeactivateButton();
+            callback(buttonRight);
     }
 
     #endregion
@@ -395,6 +411,36 @@ public class DB_UIManager : MonoBehaviour
             playerRoundTotalText.text = " ";
         if (houseRoundTotalText != null)
             houseRoundTotalText.text = " ";
+    }
+
+    public void UpdateLivesDisplay(int playerLives, int houseLives)
+    {
+        UpdateLivesText(playerLives, houseLives);
+        UpdateLivesCards(playerLives, houseLives);
+    }
+
+    public void UpdateOpponentName(string opponentName)
+    {
+        if (opponentNameText != null)
+            opponentNameText.text = string.IsNullOrWhiteSpace(opponentName) ? "House" : opponentName;
+    }
+
+    private void UpdateLivesText(int playerLives, int houseLives)
+    {
+        if (playerLivesText != null)
+            playerLivesText.text = $"Lives: {playerLives}";
+
+        if (houseLivesText != null)
+            houseLivesText.text = $"Lives: {houseLives}";
+    }
+
+    private void UpdateLivesCards(int playerLives, int houseLives)
+    {
+        if (playerLivesCardView != null)
+            playerLivesCardView.SetLives(playerLives);
+
+        if (houseLivesCardView != null)
+            houseLivesCardView.SetLives(houseLives);
     }
     
     #endregion

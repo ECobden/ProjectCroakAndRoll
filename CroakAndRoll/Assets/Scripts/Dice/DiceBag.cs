@@ -196,6 +196,27 @@ public class DiceBag : MonoBehaviour
         Debug.Log("Dice bag cleared");
     }
 
+    /// <summary>
+    /// Replace owned dice collection at runtime.
+    /// Useful for loading a new opponent profile between encounters.
+    /// </summary>
+    public void SetDiceCollection(List<DieData> dice)
+    {
+        diceCollection.Clear();
+
+        if (dice != null)
+        {
+            for (int i = 0; i < dice.Count; i++)
+            {
+                if (dice[i] != null)
+                    diceCollection.Add(dice[i]);
+            }
+        }
+
+        SetDisplayDiceOverride(null);
+        Debug.Log($"Dice bag collection replaced. Total dice: {diceCollection.Count}");
+    }
+
     #endregion
 
     #region Visual Bag Display
