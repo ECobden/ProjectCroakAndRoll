@@ -5,7 +5,7 @@ using System.Collections.Generic;
 /// ScriptableObject that holds the shop's available dice inventory.
 /// Allows for easy configuration and reuse across different shop instances.
 /// </summary>
-[CreateAssetMenu(fileName = "ShopInventory", menuName = "Croak And Roll/Shop Inventory Data")]
+[CreateAssetMenu(fileName = "ShopInventory", menuName = "Croak and Roll/Shop/Shop Inventory Data")]
 public class ShopInventoryData : ScriptableObject
 {
     [Header("Shop Inventory")]

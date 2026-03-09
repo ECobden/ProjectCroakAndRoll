@@ -39,6 +39,10 @@ public class DB_UIManager : MonoBehaviour
     [SerializeField] private TextMeshProUGUI houseLivesText;
     [SerializeField] private TextMeshProUGUI opponentNameText;
 
+    [Header("Participant Stand Text")]
+    [SerializeField] private TextMeshProUGUI playerStandText;
+    [SerializeField] private TextMeshProUGUI houseStandText;
+
     [Header("Encounter UI - Life Cards")]
     [SerializeField] private UI_LifeCardsView playerLivesCardView;
     [SerializeField] private UI_LifeCardsView houseLivesCardView;
@@ -281,6 +285,40 @@ public class DB_UIManager : MonoBehaviour
     {
         if (turnMarker != null)
             turnMarker.SetHouseTurnPosition();
+    }
+
+    #endregion
+
+    #region Participant Stand Text
+
+    public void ShowPlayerStandText()
+    {
+        if (playerStandText != null)
+            playerStandText.gameObject.SetActive(true);
+    }
+
+    public void HidePlayerStandText()
+    {
+        if (playerStandText != null)
+            playerStandText.gameObject.SetActive(false);
+    }
+
+    public void ShowHouseStandText()
+    {
+        if (houseStandText != null)
+            houseStandText.gameObject.SetActive(true);
+    }
+
+    public void HideHouseStandText()
+    {
+        if (houseStandText != null)
+            houseStandText.gameObject.SetActive(false);
+    }
+
+    public void HideAllStandText()
+    {
+        HidePlayerStandText();
+        HideHouseStandText();
     }
 
     #endregion

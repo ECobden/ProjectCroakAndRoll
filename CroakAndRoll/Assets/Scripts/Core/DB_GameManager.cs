@@ -558,6 +558,7 @@ public class DB_GameManager : MonoBehaviour
         uiManager.ClearRoundTotals();
         uiManager.ClearRollScoreText();
         uiManager.HideStandValue();
+        uiManager.HideAllStandText();
         uiManager.ResetGoalRollProgress();
     }
 
@@ -856,6 +857,11 @@ public class DB_GameManager : MonoBehaviour
     {
         if (currentState != GameState.PlayRound)
             return;
+
+        if (isPlayer)
+            uiManager.ShowPlayerStandText();
+        else
+            uiManager.ShowHouseStandText();
 
         UpdateStandValueDisplay();
 
