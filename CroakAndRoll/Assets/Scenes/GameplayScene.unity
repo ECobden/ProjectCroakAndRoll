@@ -16428,14 +16428,10 @@ MonoBehaviour:
   startingDice:
   - {fileID: 11400000, guid: 862d78e43be5d2544a9e8e70f73d87b0, type: 2}
   - {fileID: 11400000, guid: 862d78e43be5d2544a9e8e70f73d87b0, type: 2}
-  - {fileID: 11400000, guid: 862d78e43be5d2544a9e8e70f73d87b0, type: 2}
-  - {fileID: 11400000, guid: 862d78e43be5d2544a9e8e70f73d87b0, type: 2}
-  - {fileID: 11400000, guid: 862d78e43be5d2544a9e8e70f73d87b0, type: 2}
-  - {fileID: 11400000, guid: 862d78e43be5d2544a9e8e70f73d87b0, type: 2}
-  - {fileID: 11400000, guid: 862d78e43be5d2544a9e8e70f73d87b0, type: 2}
-  - {fileID: 11400000, guid: 862d78e43be5d2544a9e8e70f73d87b0, type: 2}
-  - {fileID: 11400000, guid: 862d78e43be5d2544a9e8e70f73d87b0, type: 2}
-  - {fileID: 11400000, guid: 862d78e43be5d2544a9e8e70f73d87b0, type: 2}
+  - {fileID: 11400000, guid: 346f964405e146f4198fb8d35bd4c313, type: 2}
+  - {fileID: 11400000, guid: 346f964405e146f4198fb8d35bd4c313, type: 2}
+  - {fileID: 11400000, guid: 346f964405e146f4198fb8d35bd4c313, type: 2}
+  - {fileID: 11400000, guid: 346f964405e146f4198fb8d35bd4c313, type: 2}
   dicePerRoll: 2
   spawnPoint: {fileID: 1695798032}
   gridCenter: {fileID: 1909096029}
