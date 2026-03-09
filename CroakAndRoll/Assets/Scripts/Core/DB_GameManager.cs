@@ -260,7 +260,17 @@ public class DB_GameManager : MonoBehaviour
         {
             int actualTotal = playerPos.GetTotalScore();
             playerRoundTotal = actualTotal; // Sync cached value with actual
+            
+            // Display simple total
             uiManager.UpdatePlayerRoundTotal(actualTotal);
+            
+            // Show ability modifier feedback above each die
+            var modifierData = playerPos.GetAbilityModifierDisplayData();
+            foreach (var (position, modifier) in modifierData)
+            {
+                uiManager.ShowModifierFeedback(position, modifier);
+            }
+            
             Debug.Log($"Player score updated: {actualTotal}");
         }
     }
@@ -277,7 +287,17 @@ public class DB_GameManager : MonoBehaviour
         {
             int actualTotal = housePos.GetTotalScore();
             houseRoundTotal = actualTotal; // Sync cached value with actual
+            
+            // Display simple total
             uiManager.UpdateHouseRoundTotal(actualTotal);
+            
+            // Show ability modifier feedback above each die
+            var modifierData = housePos.GetAbilityModifierDisplayData();
+            foreach (var (position, modifier) in modifierData)
+            {
+                uiManager.ShowModifierFeedback(position, modifier);
+            }
+            
             Debug.Log($"House score updated: {actualTotal}");
         }
     }
@@ -346,6 +366,12 @@ public class DB_GameManager : MonoBehaviour
     {
         Debug.Log("PLAYER BUSTED!");
 
+        // Execute OnBust abilities for player and OnOpponentBust for house
+        if (player != null)
+            player.ExecuteOnBustAbilities(house);
+        if (house != null)
+            house.ExecuteOnOpponentBustAbilities(player);
+
         if (uiManager != null)
             uiManager.ShowPlayerBust();
 
@@ -355,6 +381,12 @@ public class DB_GameManager : MonoBehaviour
     public void HouseBust()
     {
         Debug.Log("PLAYER WINS - House busted!");
+
+        // Execute OnBust abilities for house and OnOpponentBust for player
+        if (house != null)
+            house.ExecuteOnBustAbilities(player);
+        if (player != null)
+            player.ExecuteOnOpponentBustAbilities(house);
 
         if (uiManager != null)
             uiManager.ShowHouseBust();
@@ -396,6 +428,12 @@ public class DB_GameManager : MonoBehaviour
     {
         playerWonCurrentRound = playerWon;
         roundWasTie = false;
+        
+        // Execute OnRoundEnd abilities for both participants
+        if (player != null)
+            player.ExecuteOnRoundEndAbilities(house);
+        if (house != null)
+            house.ExecuteOnRoundEndAbilities(player);
         
         if (uiManager != null)
             uiManager.ClearRollScoreText();
@@ -620,6 +658,12 @@ public class DB_GameManager : MonoBehaviour
 
         SetTurnActive(isPlayerTurn, !isPlayerTurn);
 
+        // Execute OnTurnStart abilities for current participant
+        if (isPlayerTurn && player != null)
+            player.ExecuteOnTurnStartAbilities(house);
+        else if (!isPlayerTurn && house != null)
+            house.ExecuteOnTurnStartAbilities(player);
+
         if (uiManager != null)
         {
             if (isPlayerTurn)
@@ -667,6 +711,13 @@ public class DB_GameManager : MonoBehaviour
             ResolveRoundByTotals();
             return;
         }
+
+        // Execute OnTurnEnd abilities for current participant before switching
+        bool wasPlayerTurn = currentTurnMode == TurnMode.PlayerTurn;
+        if (wasPlayerTurn && player != null)
+            player.ExecuteOnTurnEndAbilities(house);
+        else if (!wasPlayerTurn && house != null)
+            house.ExecuteOnTurnEndAbilities(player);
 
         currentTurnMode = currentTurnMode == TurnMode.PlayerTurn ? TurnMode.HouseTurn : TurnMode.PlayerTurn;
 
@@ -950,7 +1001,14 @@ public class DB_GameManager : MonoBehaviour
     // State queries
     public GameState GetCurrentState() => currentState;
     public bool IsDiceRolling() => diceManager != null && diceManager.IsDiceRolling();
+    public DB_DiceManager GetDiceManager() => diceManager;
     public bool IsWaitingForPlayerRuleDecision() => isWaitingForPlayerRuleDecision;
+
+    public void RefreshScoreDisplays()
+    {
+        UpdatePlayerScoreDisplay();
+        UpdateHouseScoreDisplay();
+    }
     
     // UI control
     public void DisableGameplayButtons()

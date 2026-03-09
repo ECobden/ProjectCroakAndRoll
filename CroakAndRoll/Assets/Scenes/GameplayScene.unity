@@ -794,6 +794,9 @@ MonoBehaviour:
   playerLivesCardView: {fileID: 1331433055}
   houseLivesCardView: {fileID: 1213451635}
   diceInfoPanel: {fileID: 713676656}
+  worldSpaceCanvas: {fileID: 0}
+  modifierFeedbackDuration: 1.5
+  modifierFeedbackMoveDistance: 1
 --- !u!1 &96483473
 GameObject:
   m_ObjectHideFlags: 0

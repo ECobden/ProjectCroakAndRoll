@@ -79,6 +79,9 @@ public class Player : Participant
         }
         
         Debug.Log("[ROUND START] Player ready - Roll or Stand. Target: Get close to 21!");
+        
+        // Execute OnRoundStart abilities
+        ExecuteOnRoundStartAbilities(gameManager.GetHouseParticipant());
     }
 
     public int GetTurnValue()

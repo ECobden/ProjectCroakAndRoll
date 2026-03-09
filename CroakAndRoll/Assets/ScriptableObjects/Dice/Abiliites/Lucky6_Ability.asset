@@ -9,8 +9,10 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 0}
-  m_Name: DoubleValueAbility_
-  m_EditorClassIdentifier: Assembly-CSharp::DoubleValueAbility
-  abilityName: Double Value Ability
-  description: 
+  m_Script: {fileID: 11500000, guid: 969bcb22ab396b2498d12c2d6360706f, type: 3}
+  m_Name: Lucky6_Ability
+  m_EditorClassIdentifier: Assembly-CSharp::SetFaceValueAbility
+  abilityName: Lucky 6
+  description: 'Set dice to be a 6 '
+  targetFaceValue: 6
+  useAnimation: 1

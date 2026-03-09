@@ -51,8 +51,9 @@ public class House : Participant
         if (uiManager != null)
         {
             uiManager.ResetGoalRollProgress();
-        }
-        
+        }        
+        // Execute OnRoundStart abilities
+        ExecuteOnRoundStartAbilities(gameManager.GetPlayerParticipant());        
         // Target value is not used in alternating mode
         targetValue = 0;
         

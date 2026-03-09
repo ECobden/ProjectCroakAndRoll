@@ -50,6 +50,11 @@ public class DB_UIManager : MonoBehaviour
     [Header("Dice Info Display")]
     [SerializeField] private DiceInfoPanel diceInfoPanel;
 
+    [Header("Ability Feedback")]
+    [SerializeField] private Transform worldSpaceCanvas;
+    [SerializeField] private float modifierFeedbackDuration = 1.5f;
+    [SerializeField] private float modifierFeedbackMoveDistance = 1.0f;
+
     #endregion
 
     #region Private Fields
@@ -449,6 +454,49 @@ public class DB_UIManager : MonoBehaviour
             playerRoundTotalText.text = " ";
         if (houseRoundTotalText != null)
             houseRoundTotalText.text = " ";
+    }
+
+    /// <summary>
+    /// Show floating modifier feedback (e.g., "+2" or "-3") above a dice position
+    /// </summary>
+    public void ShowModifierFeedback(Vector3 worldPosition, int modifier)
+    {
+        StartCoroutine(ShowModifierFeedbackCoroutine(worldPosition, modifier));
+    }
+
+    private IEnumerator ShowModifierFeedbackCoroutine(Vector3 worldPosition, int modifier)
+    {
+        // Create a temporary GameObject with TextMeshProUGUI for the feedback
+        GameObject feedbackObj = new GameObject("ModifierFeedback");
+        feedbackObj.transform.SetParent(worldSpaceCanvas != null ? worldSpaceCanvas : transform);
+        feedbackObj.transform.position = worldPosition + Vector3.up * 0.5f;
+
+        // Add TextMeshProUGUI component
+        TextMeshProUGUI feedbackText = feedbackObj.AddComponent<TextMeshProUGUI>();
+        feedbackText.text = (modifier > 0 ? "+" : "") + modifier.ToString();
+        feedbackText.fontSize = 36;
+        feedbackText.alignment = TextAlignmentOptions.Center;
+        feedbackText.color = modifier > 0 ? Color.green : Color.red;
+
+        // Animate: move up and fade out
+        float elapsed = 0f;
+        Vector3 startPos = worldPosition + Vector3.up * 0.5f;
+        Vector3 endPos = startPos + Vector3.up * modifierFeedbackMoveDistance;
+        Color startColor = feedbackText.color;
+        Color endColor = new Color(startColor.r, startColor.g, startColor.b, 0f);
+
+        while (elapsed < modifierFeedbackDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / modifierFeedbackDuration;
+
+            feedbackObj.transform.position = Vector3.Lerp(startPos, endPos, t);
+            feedbackText.color = Color.Lerp(startColor, endColor, t);
+
+            yield return null;
+        }
+
+        Destroy(feedbackObj);
     }
 
     public void UpdateLivesDisplay(int playerLives, int houseLives)

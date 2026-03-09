@@ -2,7 +2,8 @@ using UnityEngine;
 
 /// <summary>
 /// Base class for dice abilities.
-/// Each die can have special abilities that trigger when rolled or matched.
+/// Each die can have special abilities that trigger at different game lifecycle moments.
+/// Abilities override specific lifecycle hooks (OnRoll, OnScore, OnTurnStart, etc.) to implement their effects.
 /// Examples: SwapAbility, MoneyAbility, ExtraRollAbility, etc.
 /// </summary>
 public abstract class DiceAbility : ScriptableObject
@@ -10,90 +11,57 @@ public abstract class DiceAbility : ScriptableObject
     public string abilityName;
     public string description;
 
+    #region Lifecycle Hooks
     /// <summary>
-    /// Execute this ability when triggered.
+    /// Called when the die is rolled and lands on a value.
+    /// Use this for immediate effects like granting money, triggering extra rolls, etc.
     /// </summary>
-    /// <param name="instigator">The participant who triggered the ability</param>
-    /// <param name="opponent">The opposing participant</param>
-    /// <param name="diceValue">The value of the die that triggered this ability</param>
-    public abstract void Execute(Participant instigator, Participant opponent, int diceValue);
+    public virtual void OnRoll(AbilityContext context) { }
 
     /// <summary>
-    /// Get a display name for this ability.
+    /// Called during score calculation. Can modify or return a score adjustment.
+    /// Use this for abilities that affect scoring like doubling values or stealing points.
     /// </summary>
-    public virtual string GetDisplayName()
-    {
-        return abilityName;
-    }
+    /// <returns>Score modifier to add (positive or negative). Return 0 for no change.</returns>
+    public virtual int OnScore(AbilityContext context) { return 0; }
+
+    /// <summary>
+    /// Called at the start of the instigator's turn (before any rolls).
+    /// Use this for turn-start effects like buffs, preparations, or UI triggers.
+    /// </summary>
+    public virtual void OnParticipantTurnStart(AbilityContext context) { }
+
+    /// <summary>
+    /// Called at the end of the instigator's turn (after all rolls and actions).
+    /// Use this for cleanup, end-of-turn effects, or cooldown resets.
+    /// </summary>
+    public virtual void OnParticipantTurnEnd(AbilityContext context) { }
+
+    /// <summary>
+    /// Called at the start of a new round (before any participant takes their turn).
+    /// Use this for round-based cooldowns or recurring effects.
+    /// </summary>
+    public virtual void OnRoundStart(AbilityContext context) { }
+
+    /// <summary>
+    /// Called at the end of a round (after all participants have finished their turns).
+    /// Use this for round cleanup or end-of-round scoring effects.
+    /// </summary>
+    public virtual void OnRoundEnd(AbilityContext context) { }
+
+    /// <summary>
+    /// Called when the instigator busts (goes over 21).
+    /// Use this for bust-related penalties or reactions.
+    /// </summary>
+    public virtual void OnBust(AbilityContext context) { }
+
+    /// <summary>
+    /// Called when the opponent busts (goes over 21).
+    /// Use this for opponent-bust bonuses or reactions.
+    /// </summary>
+    public virtual void OnOpponentBust(AbilityContext context) { }
+    #endregion
+
 }
 
-/// <summary>
-/// Ability that allows swapping a die with opponent's die.
-/// </summary>
-[CreateAssetMenu(fileName = "SwapAbility_", menuName = "Croak and Roll/Abilities/Swap Ability", order = 1)]
-public class SwapAbility : DiceAbility
-{
-    public override void Execute(Participant instigator, Participant opponent, int diceValue)
-    {
-        Debug.Log($"{instigator.gameObject.name} can swap a die! (triggered by value {diceValue})");
-        // TODO: Implement swap logic - show UI for selecting opponent die to swap with
-    }
-}
 
-/// <summary>
-/// Ability that grants money based on roll value.
-/// </summary>
-[CreateAssetMenu(fileName = "MoneyAbility_", menuName = "Croak and Roll/Abilities/Money Ability", order = 2)]
-public class MoneyAbility : DiceAbility
-{
-    [SerializeField] private int moneyPerPoint = 1;
-
-    public override void Execute(Participant instigator, Participant opponent, int diceValue)
-    {
-        int earnedMoney = diceValue * moneyPerPoint;
-        instigator.AddMoney(earnedMoney);
-        Debug.Log($"{instigator.gameObject.name} earned {earnedMoney} from MoneyAbility!");
-    }
-}
-
-/// <summary>
-/// Ability that grants an extra roll.
-/// </summary>
-[CreateAssetMenu(fileName = "ExtraRollAbility_", menuName = "Croak and Roll/Abilities/Extra Roll Ability", order = 3)]
-public class ExtraRollAbility : DiceAbility
-{
-    public override void Execute(Participant instigator, Participant opponent, int diceValue)
-    {
-        Debug.Log($"{instigator.gameObject.name} gets an extra roll! (triggered by value {diceValue})");
-        // TODO: Implement extra roll logic - notify GameManager to allow another roll this turn
-    }
-}
-
-/// <summary>
-/// Ability that steals points from opponent.
-/// </summary>
-[CreateAssetMenu(fileName = "StealPointsAbility_", menuName = "Croak and Roll/Abilities/Steal Points Ability", order = 4)]
-public class StealPointsAbility : DiceAbility
-{
-    [SerializeField] private int pointsToSteal = 5;
-
-    public override void Execute(Participant instigator, Participant opponent, int diceValue)
-    {
-        Debug.Log($"{instigator.gameObject.name} steals {pointsToSteal} points from {opponent.gameObject.name}!");
-        // TODO: Implement point stealing logic
-    }
-}
-
-/// <summary>
-/// Ability that doubles the roll value.
-/// </summary>
-[CreateAssetMenu(fileName = "DoubleValueAbility_", menuName = "Croak and Roll/Abilities/Double Value Ability", order = 5)]
-public class DoubleValueAbility : DiceAbility
-{
-    public override void Execute(Participant instigator, Participant opponent, int diceValue)
-    {
-        int doubledValue = diceValue * 2;
-        Debug.Log($"{instigator.gameObject.name} doubled their roll! {diceValue} -> {doubledValue}");
-        // TODO: Implement doubling logic - modify the score calculation
-    }
-}

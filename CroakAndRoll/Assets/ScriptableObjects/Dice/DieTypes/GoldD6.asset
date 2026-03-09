@@ -20,6 +20,6 @@ MonoBehaviour:
   dieMaterialOverride: {fileID: 2100000, guid: 75e04092df37b45449ac6cf6cb54f64c, type: 2}
   faceValues: 010000000200000003000000040000000500000006000000
   abilities:
-  - {fileID: 0}
+  - {fileID: 11400000, guid: fd4d0913b54625d45bec84cfa9adadb2, type: 2}
   rarity: 1
   cost: 10

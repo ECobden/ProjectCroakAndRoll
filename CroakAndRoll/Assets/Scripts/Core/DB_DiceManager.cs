@@ -33,6 +33,8 @@ public class DB_DiceManager : MonoBehaviour
 
     private DB_DiceController diceControllerA;
     private DB_DiceController diceControllerB;
+    private DB_DiceController lastRolledDiceControllerA;
+    private DB_DiceController lastRolledDiceControllerB;
     private bool isDiceRolling = false;
 
     #endregion
@@ -226,6 +228,10 @@ public class DB_DiceManager : MonoBehaviour
         // Store references to current dice
         DB_DiceController currentDiceA = diceControllerA;
         DB_DiceController currentDiceB = diceControllerB;
+
+        // Keep stable references for abilities that run after this method clears active roll references.
+        lastRolledDiceControllerA = currentDiceA;
+        lastRolledDiceControllerB = currentDiceB;
         
         // Clear the main references so next roll can spawn new dice
         diceControllerA = null;
@@ -320,6 +326,40 @@ public class DB_DiceManager : MonoBehaviour
     public int GetDiceBValue()
     {
         return diceControllerB != null ? diceControllerB.GetLastRollValue() : 0;
+    }
+    
+    /// <summary>
+    /// Get the dice controller for dice A
+    /// </summary>
+    public DB_DiceController GetDiceControllerA()
+    {
+        return diceControllerA;
+    }
+    
+    /// <summary>
+    /// Get the dice controller for dice B
+    /// </summary>
+    public DB_DiceController GetDiceControllerB()
+    {
+        return diceControllerB;
+    }
+
+    /// <summary>
+    /// Get the most recently rolled dice controller for dice A.
+    /// This remains valid after the active roll references are cleared.
+    /// </summary>
+    public DB_DiceController GetLastRolledDiceControllerA()
+    {
+        return lastRolledDiceControllerA;
+    }
+
+    /// <summary>
+    /// Get the most recently rolled dice controller for dice B.
+    /// This remains valid after the active roll references are cleared.
+    /// </summary>
+    public DB_DiceController GetLastRolledDiceControllerB()
+    {
+        return lastRolledDiceControllerB;
     }
     
     /// <summary>

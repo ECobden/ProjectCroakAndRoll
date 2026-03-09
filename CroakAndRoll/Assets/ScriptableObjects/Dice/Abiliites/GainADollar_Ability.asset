@@ -9,9 +9,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 0}
-  m_Name: MoneyAbility_
-  m_EditorClassIdentifier: Assembly-CSharp::MoneyAbility
-  abilityName: Gold Die
-  description: Adds Money based on the rolled amount
+  m_Script: {fileID: 11500000, guid: d06059547c6f45e44bc1d250df63554e, type: 3}
+  m_Name: GainADollar_Ability
+  m_EditorClassIdentifier: Assembly-CSharp::MoneyOnRollAbility
+  abilityName: Gain Dollars
+  description: Get Money based on the rolled value of this dice.
   moneyPerPoint: 1

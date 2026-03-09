@@ -19,6 +19,7 @@ MonoBehaviour:
   diePrefab: {fileID: 8436088037483572239, guid: 8c38f05ff2d0b0443921baee334cd4b5, type: 3}
   dieMaterialOverride: {fileID: 2100000, guid: 7b733e33d47bbc74f87b91553f049330, type: 2}
   faceValues: 010000000200000003000000040000000500000006000000
-  abilities: []
+  abilities:
+  - {fileID: 11400000, guid: 998ba18123951ff4f930568d7451ae02, type: 2}
   rarity: 1
   cost: 15

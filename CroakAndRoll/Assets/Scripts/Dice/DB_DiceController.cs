@@ -281,6 +281,8 @@ public class DB_DiceController : MonoBehaviour
 
     public int GetLastRollValue() => lastRollValue;
 
+    public DieData GetDieData() => currentDieData;
+
     public bool IsRolling() => isRolling;
     
     public bool IsFlipping() => isFlipping;
@@ -459,38 +461,39 @@ public class DB_DiceController : MonoBehaviour
     /// </summary>
     private Quaternion GetRotationForFaceValue(int faceValue)
     {
-        // Determine which local axis should point up for this face value
-        // Face 2: Local Y+ (up)
-        // Face 5: Local Y- (down)
-        // Face 1: Local X+ (right)
-        // Face 6: Local X- (left)
-        // Face 3: Local Z+ (forward)
-        // Face 4: Local Z- (back)
+        // Determine which local axis should point up for this face value.
+        // This mapping must match GetDiceFaceValue().
+        // Face 1: Local Y+ (up)
+        // Face 6: Local Y- (down)
+        // Face 4: Local X+ (right)
+        // Face 3: Local X- (left)
+        // Face 2: Local Z+ (forward)
+        // Face 5: Local Z- (back)
         
         Vector3 localAxisToPointUp;
         
         switch (faceValue)
         {
-            case 2:
+            case 1:
                 localAxisToPointUp = Vector3.up;      // Local Y+
                 break;
-            case 5:
+            case 6:
                 localAxisToPointUp = Vector3.down;    // Local Y-
                 break;
-            case 1:
+            case 4:
                 localAxisToPointUp = Vector3.right;   // Local X+
                 break;
-            case 6:
+            case 3:
                 localAxisToPointUp = Vector3.left;    // Local X-
                 break;
-            case 3:
+            case 2:
                 localAxisToPointUp = Vector3.forward; // Local Z+
                 break;
-            case 4:
+            case 5:
                 localAxisToPointUp = Vector3.back;    // Local Z-
                 break;
             default:
-                Debug.LogWarning($"[DB_DiceController] Invalid face value {faceValue}, defaulting to face 2");
+                Debug.LogWarning($"[DB_DiceController] Invalid face value {faceValue}, defaulting to face 1");
                 localAxisToPointUp = Vector3.up;
                 break;
         }

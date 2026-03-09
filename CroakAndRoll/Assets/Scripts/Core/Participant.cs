@@ -425,6 +425,8 @@ public abstract class Participant : MonoBehaviour
         return new List<DieData>(lastConsumedRollDice);
     }
 
+    #region Ability Lifecycle Triggers
+
     /// <summary>
     /// Execute abilities for each die consumed in the most recent roll.
     /// Die order maps to callback values: index 0 -> diceAValue, index 1 -> diceBValue.
@@ -441,18 +443,231 @@ public abstract class Participant : MonoBehaviour
                 continue;
 
             int dieValue = i == 0 ? diceAValue : diceBValue;
+            AbilityContext context = CreateAbilityContext(opponent, dieValue, dieData, i);
+            
             List<DiceAbility> abilities = dieData.GetAbilities();
-
             for (int abilityIndex = 0; abilityIndex < abilities.Count; abilityIndex++)
             {
                 DiceAbility ability = abilities[abilityIndex];
                 if (ability == null)
                     continue;
 
-                ability.Execute(this, opponent, dieValue);
+                ability.OnRoll(context);
             }
         }
     }
+
+    /// <summary>
+    /// Execute OnScore abilities for dice in play and return total score modifier.
+    /// Called during score calculation to allow abilities to modify scores.
+    /// </summary>
+    protected int ExecuteOnScoreAbilities(int diceAValue, int diceBValue, Participant opponent)
+    {
+        int totalModifier = 0;
+        
+        if (lastConsumedRollDice == null || lastConsumedRollDice.Count == 0)
+            return totalModifier;
+
+        for (int i = 0; i < lastConsumedRollDice.Count; i++)
+        {
+            DieData dieData = lastConsumedRollDice[i];
+            if (dieData == null || !dieData.HasAbilities())
+                continue;
+
+            int dieValue = i == 0 ? diceAValue : diceBValue;
+            AbilityContext context = CreateAbilityContext(opponent, dieValue, dieData, i);
+            
+            List<DiceAbility> abilities = dieData.GetAbilities();
+            for (int abilityIndex = 0; abilityIndex < abilities.Count; abilityIndex++)
+            {
+                DiceAbility ability = abilities[abilityIndex];
+                if (ability == null)
+                    continue;
+
+                totalModifier += ability.OnScore(context);
+            }
+        }
+        
+        return totalModifier;
+    }
+
+    /// <summary>
+    /// Execute OnParticipantTurnStart abilities for all dice in this participant's bag.
+    /// Called at the start of this participant's turn.
+    /// </summary>
+    public void ExecuteOnTurnStartAbilities(Participant opponent)
+    {
+        if (diceBag == null)
+            return;
+
+        List<DieData> allDice = diceBag.GetAllDice();
+        foreach (DieData dieData in allDice)
+        {
+            if (dieData == null || !dieData.HasAbilities())
+                continue;
+
+            AbilityContext context = CreateAbilityContext(opponent, 0, dieData);
+            List<DiceAbility> abilities = dieData.GetAbilities();
+            
+            foreach (DiceAbility ability in abilities)
+            {
+                if (ability == null)
+                    continue;
+
+                ability.OnParticipantTurnStart(context);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Execute OnParticipantTurnEnd abilities for all dice in this participant's bag.
+    /// Called at the end of this participant's turn.
+    /// </summary>
+    public void ExecuteOnTurnEndAbilities(Participant opponent)
+    {
+        if (diceBag == null)
+            return;
+
+        List<DieData> allDice = diceBag.GetAllDice();
+        foreach (DieData dieData in allDice)
+        {
+            if (dieData == null || !dieData.HasAbilities())
+                continue;
+
+            AbilityContext context = CreateAbilityContext(opponent, 0, dieData);
+            List<DiceAbility> abilities = dieData.GetAbilities();
+            
+            foreach (DiceAbility ability in abilities)
+            {
+                if (ability == null)
+                    continue;
+
+                ability.OnParticipantTurnEnd(context);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Execute OnRoundStart abilities for all dice in this participant's bag.
+    /// Called at the start of a new round.
+    /// </summary>
+    public void ExecuteOnRoundStartAbilities(Participant opponent)
+    {
+        if (diceBag == null)
+            return;
+
+        List<DieData> allDice = diceBag.GetAllDice();
+        foreach (DieData dieData in allDice)
+        {
+            if (dieData == null || !dieData.HasAbilities())
+                continue;
+
+            AbilityContext context = CreateAbilityContext(opponent, 0, dieData);
+            List<DiceAbility> abilities = dieData.GetAbilities();
+            
+            foreach (DiceAbility ability in abilities)
+            {
+                if (ability == null)
+                    continue;
+
+                ability.OnRoundStart(context);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Execute OnRoundEnd abilities for all dice in this participant's bag.
+    /// Called at the end of a round.
+    /// </summary>
+    public void ExecuteOnRoundEndAbilities(Participant opponent)
+    {
+        if (diceBag == null)
+            return;
+
+        List<DieData> allDice = diceBag.GetAllDice();
+        foreach (DieData dieData in allDice)
+        {
+            if (dieData == null || !dieData.HasAbilities())
+                continue;
+
+            AbilityContext context = CreateAbilityContext(opponent, 0, dieData);
+            List<DiceAbility> abilities = dieData.GetAbilities();
+            
+            foreach (DiceAbility ability in abilities)
+            {
+                if (ability == null)
+                    continue;
+
+                ability.OnRoundEnd(context);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Execute OnBust abilities when this participant busts.
+    /// Called when this participant's score goes over 21.
+    /// </summary>
+    public void ExecuteOnBustAbilities(Participant opponent)
+    {
+        if (diceBag == null)
+            return;
+
+        List<DieData> allDice = diceBag.GetAllDice();
+        foreach (DieData dieData in allDice)
+        {
+            if (dieData == null || !dieData.HasAbilities())
+                continue;
+
+            AbilityContext context = CreateAbilityContext(opponent, 0, dieData);
+            List<DiceAbility> abilities = dieData.GetAbilities();
+            
+            foreach (DiceAbility ability in abilities)
+            {
+                if (ability == null)
+                    continue;
+
+                ability.OnBust(context);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Execute OnOpponentBust abilities when the opponent busts.
+    /// Called when the opponent's score goes over 21.
+    /// </summary>
+    public void ExecuteOnOpponentBustAbilities(Participant opponent)
+    {
+        if (diceBag == null)
+            return;
+
+        List<DieData> allDice = diceBag.GetAllDice();
+        foreach (DieData dieData in allDice)
+        {
+            if (dieData == null || !dieData.HasAbilities())
+                continue;
+
+            AbilityContext context = CreateAbilityContext(opponent, 0, dieData);
+            List<DiceAbility> abilities = dieData.GetAbilities();
+            
+            foreach (DiceAbility ability in abilities)
+            {
+                if (ability == null)
+                    continue;
+
+                ability.OnOpponentBust(context);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Create an AbilityContext for ability execution.
+    /// </summary>
+    private AbilityContext CreateAbilityContext(Participant opponent, int diceValue, DieData dieData, int dieIndex = -1)
+    {
+        return new AbilityContext(this, opponent, diceValue, gameManager, dieData, dieIndex);
+    }
+
+    #endregion
 
     #endregion
 }
