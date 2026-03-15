@@ -78,6 +78,12 @@ public class DB_GameManager : MonoBehaviour
     [SerializeField] private int baseRoundWinReward = 100;
     [SerializeField] private int gameSeed = 12345;
 
+    [Header("Audio SFX")]
+    [SerializeField] private AudioSource sfxAudioSource;
+    [SerializeField] private AudioClip participantBustSound;
+    [SerializeField] private AudioClip hit21Sound;
+    [SerializeField] private AudioClip normalWinSound;
+
     [Header("Opponent Progression")]
     [SerializeField] private List<OpponentProfileData> opponentProfiles = new List<OpponentProfileData>();
     [SerializeField] private bool loopOpponentProfiles = true;
@@ -121,6 +127,9 @@ public class DB_GameManager : MonoBehaviour
 
     private void Start()
     {
+        if (sfxAudioSource == null)
+            sfxAudioSource = GetComponent<AudioSource>();
+
         // One-time initialization only
         InitializeDice();
         InitializeUI();
@@ -365,6 +374,7 @@ public class DB_GameManager : MonoBehaviour
     public void PlayerBust()
     {
         Debug.Log("PLAYER BUSTED!");
+        PlayOutcomeSfx(participantBustSound);
 
         // Execute OnBust abilities for player and OnOpponentBust for house
         if (player != null)
@@ -381,6 +391,7 @@ public class DB_GameManager : MonoBehaviour
     public void HouseBust()
     {
         Debug.Log("PLAYER WINS - House busted!");
+        PlayOutcomeSfx(participantBustSound);
 
         // Execute OnBust abilities for house and OnOpponentBust for player
         if (house != null)
@@ -397,6 +408,7 @@ public class DB_GameManager : MonoBehaviour
     public void PlayerWinsWith21()
     {
         Debug.Log("PLAYER WINS - Hit 21!");
+        PlayOutcomeSfx(hit21Sound);
         
         if (uiManager != null)
             uiManager.ShowPlayer21();
@@ -407,6 +419,7 @@ public class DB_GameManager : MonoBehaviour
     private void HouseWinsWith21()
     {
         Debug.Log("HOUSE WINS - Hit 21!");
+        PlayOutcomeSfx(hit21Sound);
 
         if (uiManager != null)
             uiManager.ShowHouse21();
@@ -417,6 +430,7 @@ public class DB_GameManager : MonoBehaviour
     public void HouseWins()
     {
         Debug.Log("HOUSE WINS - House beat player's score!");
+        PlayOutcomeSfx(normalWinSound);
 
         if (uiManager != null)
             uiManager.ShowHouseWins();
@@ -781,6 +795,8 @@ public class DB_GameManager : MonoBehaviour
 
         if (playerTotal > houseTotal)
         {
+            PlayOutcomeSfx(normalWinSound);
+
             if (uiManager != null)
                 uiManager.ShowPlayerWins();
 
@@ -788,6 +804,8 @@ public class DB_GameManager : MonoBehaviour
         }
         else if (houseTotal > playerTotal)
         {
+            PlayOutcomeSfx(normalWinSound);
+
             if (uiManager != null)
                 uiManager.ShowHouseWins();
 
@@ -797,6 +815,12 @@ public class DB_GameManager : MonoBehaviour
         {
             EndRoundTie();
         }
+    }
+
+    private void PlayOutcomeSfx(AudioClip clip)
+    {
+        if (sfxAudioSource != null && clip != null)
+            sfxAudioSource.PlayOneShot(clip);
     }
 
     private void EndRoundTie()

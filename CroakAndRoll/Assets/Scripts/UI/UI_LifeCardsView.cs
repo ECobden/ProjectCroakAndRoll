@@ -34,12 +34,18 @@ public class UI_LifeCardsView : MonoBehaviour
     [SerializeField] private string burnShaderPropertyName = "_BurnAmount";
     [SerializeField] private float burnEffectDuration = 1.0f;
 
+    [Header("Audio")]
+    [SerializeField] private AudioSource audioSource;
+    [SerializeField] private AudioClip lifeAddedSound;
+    [SerializeField] private bool playLifeAddedSoundOnInitialSync = false;
+
     #endregion
 
     #region Private Fields
 
     private readonly List<GameObject> lifeCards = new List<GameObject>();
     private readonly List<Material> burnMaterials = new List<Material>();
+    private bool hasSyncedLives;
 
     #endregion
 
@@ -49,6 +55,9 @@ public class UI_LifeCardsView : MonoBehaviour
     {
         if (livesAnchor == null)
             livesAnchor = transform;
+
+        if (audioSource == null)
+            audioSource = GetComponent<AudioSource>();
     }
 
     #endregion
@@ -63,12 +72,19 @@ public class UI_LifeCardsView : MonoBehaviour
         if (livesAnchor == null || lifeCardPrefab == null)
             return;
 
+        int previousLives = lifeCards.Count;
         targetLives = Mathf.Max(0, targetLives);
+        bool livesIncreased = targetLives > previousLives;
 
         AddMissingCards(targetLives);
         RemoveExtraCards(targetLives);
 
         RepositionCards();
+
+        if (livesIncreased && (hasSyncedLives || playLifeAddedSoundOnInitialSync))
+            PlayLifeAddedSound();
+
+        hasSyncedLives = true;
     }
 
     /// <summary>
@@ -213,6 +229,12 @@ public class UI_LifeCardsView : MonoBehaviour
     {
         for (int i = 0; i < burnMaterials.Count; i++)
             burnMaterials[i].SetFloat(burnShaderPropertyName, burnValue);
+    }
+
+    private void PlayLifeAddedSound()
+    {
+        if (audioSource != null && lifeAddedSound != null)
+            audioSource.PlayOneShot(lifeAddedSound);
     }
 
     #endregion
