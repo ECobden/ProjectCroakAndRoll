@@ -137,6 +137,14 @@ public class Player : Participant
         UpdateMoneyUI();
     }
 
+    public override bool SpendMoney(int amount)
+    {
+        bool spent = base.SpendMoney(amount);
+        if (spent)
+            UpdateMoneyUI();
+        return spent;
+    }
+
     public override void ResetMoney()
     {
         base.ResetMoney();

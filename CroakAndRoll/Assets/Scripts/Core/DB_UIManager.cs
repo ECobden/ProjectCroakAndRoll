@@ -47,6 +47,11 @@ public class DB_UIManager : MonoBehaviour
     [SerializeField] private UI_LifeCardsView playerLivesCardView;
     [SerializeField] private UI_LifeCardsView houseLivesCardView;
 
+    [Header("Shop Buttons")]
+    [SerializeField] private UI_ButtonController shopContinueButton;
+    [SerializeField] private UI_ButtonController shopBuyButton;
+    [SerializeField] private UI_ButtonController shopRerollButton;
+
     [Header("Dice Info Display")]
     [SerializeField] private DiceInfoPanel diceInfoPanel;
 
@@ -106,6 +111,20 @@ public class DB_UIManager : MonoBehaviour
 
         if (gameOverPanel != null)
             gameOverPanel.SetActive(false);
+
+        HideShopButtonsImmediate();
+    }
+
+    private void HideShopButtonsImmediate()
+    {
+        if (shopContinueButton != null)
+            shopContinueButton.gameObject.SetActive(false);
+
+        if (shopBuyButton != null)
+            shopBuyButton.gameObject.SetActive(false);
+
+        if (shopRerollButton != null)
+            shopRerollButton.gameObject.SetActive(false);
     }
 
     #endregion
@@ -258,6 +277,58 @@ public class DB_UIManager : MonoBehaviour
     {
         if (buttonRight != null)
             callback(buttonRight);
+    }
+
+    #endregion
+
+    #region Shop Buttons
+
+    public void ShowShopButtons(Action onContinue, Action onReroll)
+    {
+        if (shopContinueButton != null)
+        {
+            shopContinueButton.gameObject.SetActive(true);
+            shopContinueButton.SetButtonText("Continue");
+            shopContinueButton.SetButtonAction(onContinue);
+            shopContinueButton.ActivateButton();
+        }
+
+        if (shopRerollButton != null)
+        {
+            shopRerollButton.gameObject.SetActive(true);
+            shopRerollButton.SetButtonText("Reroll");
+            shopRerollButton.SetButtonAction(onReroll);
+            shopRerollButton.ActivateButton();
+        }
+    }
+
+    public void HideShopButtons()
+    {
+        if (shopContinueButton != null)
+            shopContinueButton.gameObject.SetActive(false);
+
+        if (shopBuyButton != null)
+            shopBuyButton.gameObject.SetActive(false);
+
+        if (shopRerollButton != null)
+            shopRerollButton.gameObject.SetActive(false);
+    }
+
+    public void ShowShopBuyButton(Action onBuy)
+    {
+        if (shopBuyButton != null)
+        {
+            shopBuyButton.gameObject.SetActive(true);
+            shopBuyButton.SetButtonText("Buy");
+            shopBuyButton.SetButtonAction(onBuy);
+            shopBuyButton.ActivateButton();
+        }
+    }
+
+    public void HideShopBuyButton()
+    {
+        if (shopBuyButton != null)
+            shopBuyButton.gameObject.SetActive(false);
     }
 
     #endregion
@@ -503,6 +574,15 @@ public class DB_UIManager : MonoBehaviour
     {
         UpdateLivesText(playerLives, houseLives);
         UpdateLivesCards(playerLives, houseLives);
+    }
+
+    public void ClearLivesCards()
+    {
+        if (playerLivesCardView != null)
+            playerLivesCardView.ClearLifeCards();
+
+        if (houseLivesCardView != null)
+            houseLivesCardView.ClearLifeCards();
     }
 
     public void UpdateOpponentName(string opponentName)

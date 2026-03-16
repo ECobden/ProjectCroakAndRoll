@@ -17,7 +17,6 @@ public class ShopManager : MonoBehaviour
     [Header("Shop Item Spawning")]
     [SerializeField] private Transform[] shopItemSpawnPoints;
     [SerializeField] private GameObject rerollObject;
-    [SerializeField] private UnityEngine.UI.Button continueButton;
 
     [Header("References")]
     [SerializeField] private DB_GameManager gameManager;
@@ -46,11 +45,6 @@ public class ShopManager : MonoBehaviour
             playerDiceBag = player.GetComponent<DiceBag>();
         }
 
-        // Set up continue button
-        if (continueButton != null)
-        {
-            continueButton.onClick.AddListener(CloseShop);
-        }
     }
 
     #endregion
@@ -63,7 +57,14 @@ public class ShopManager : MonoBehaviour
     public void OpenShop(int seed)
     {
         isShopOpen = true;
-        
+
+        // Hide gameplay buttons and show shop buttons
+        if (DB_UIManager.Instance != null)
+        {
+            DB_UIManager.Instance.HideButtonPanel();
+            DB_UIManager.Instance.ShowShopButtons(CloseShop, () => RerollShop());
+        }
+
         // Show shop machine
         if (shopMachineController != null)
         {
@@ -84,6 +85,10 @@ public class ShopManager : MonoBehaviour
     public void CloseShop()
     {
         isShopOpen = false;
+
+        // Hide shop buttons
+        if (DB_UIManager.Instance != null)
+            DB_UIManager.Instance.HideShopButtons();
 
         // Hide shop machine
         if (shopMachineController != null)
@@ -214,6 +219,9 @@ public class ShopManager : MonoBehaviour
             if (purchasedObject != null)
                 Destroy(purchasedObject);
         }
+
+        if (DB_UIManager.Instance != null)
+            DB_UIManager.Instance.HideShopBuyButton();
     }
 
     /// <summary>
@@ -345,6 +353,9 @@ public class ShopManager : MonoBehaviour
         instantiatedShopItems.Clear();
         currentShopOffers.Clear();
         shopDiceLookup.Clear();
+
+        if (DB_UIManager.Instance != null)
+            DB_UIManager.Instance.HideShopBuyButton();
     }
 
     private void OnShopDiceClicked(DB_DiceController clickedDice)
@@ -359,6 +370,9 @@ public class ShopManager : MonoBehaviour
 
         selectedShopDice = clickedDice;
         selectedShopDice.Highlight(Color.blue);
+
+        if (DB_UIManager.Instance != null)
+            DB_UIManager.Instance.ShowShopBuyButton(BuyItem);
     }
 
     #endregion

@@ -511,6 +511,9 @@ public class DB_GameManager : MonoBehaviour
 
             if (shopManager != null)
             {
+                if (uiManager != null)
+                    uiManager.ClearLivesCards();
+
                 shopManager.OpenShop(gameSeed + currentRound);
                 yield break;
             }
