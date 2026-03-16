@@ -3,6 +3,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.Events;
 using DG.Tweening;
 using TMPro;
+using UnityEngine.UI;
 
 public class UI_MenuButtonController : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
 {
@@ -10,6 +11,7 @@ public class UI_MenuButtonController : MonoBehaviour, IPointerEnterHandler, IPoi
     [SerializeField] private float highlightBounceX = 50f;
     [SerializeField] private float highlightDuration = 0.3f;
     [SerializeField] private Ease highlightEase = Ease.OutBack;
+    [SerializeField] private float highlightSlideFromLeft = 20f;
     
     [SerializeField] private float clickBounceX = 20f;
     [SerializeField] private float clickDuration = 0.15f;
@@ -32,6 +34,7 @@ public class UI_MenuButtonController : MonoBehaviour, IPointerEnterHandler, IPoi
     [SerializeField] private RectTransform buttonRect;
     [SerializeField] private TextMeshProUGUI buttonText;
     [SerializeField] private CanvasGroup canvasGroup;
+    [SerializeField] private Graphic clickTargetGraphic;
     
     [Header("Audio Settings")]
     [SerializeField] private AudioClip hoverSound;
@@ -62,14 +65,24 @@ public class UI_MenuButtonController : MonoBehaviour, IPointerEnterHandler, IPoi
         
         if (canvasGroup == null)
             canvasGroup = GetComponent<CanvasGroup>();
+
+        if (clickTargetGraphic == null)
+            clickTargetGraphic = GetComponent<Graphic>();
         
         // Store original values
         originalAnchoredPosition = buttonRect.anchoredPosition;
         originalScale = buttonRect.localScale;
+
+        if (clickTargetGraphic != null)
+            clickTargetGraphic.raycastTarget = true;
         
         // Start hidden
         if (canvasGroup != null)
+        {
             canvasGroup.alpha = 0f;
+            canvasGroup.interactable = false;
+            canvasGroup.blocksRaycasts = false;
+        }
         
         buttonRect.anchoredPosition = originalAnchoredPosition + new Vector2(showOffsetX, 0);
     }
@@ -130,7 +143,14 @@ public class UI_MenuButtonController : MonoBehaviour, IPointerEnterHandler, IPoi
         if (isVisible) return;
         
         isVisible = true;
+        isDisabled = false;
         currentAnimation?.Kill();
+
+        if (canvasGroup != null)
+        {
+            canvasGroup.interactable = true;
+            canvasGroup.blocksRaycasts = true;
+        }
         
         currentAnimation = DOTween.Sequence();
         
@@ -168,6 +188,12 @@ public class UI_MenuButtonController : MonoBehaviour, IPointerEnterHandler, IPoi
         
         isVisible = false;
         currentAnimation?.Kill();
+
+        if (canvasGroup != null)
+        {
+            canvasGroup.interactable = false;
+            canvasGroup.blocksRaycasts = false;
+        }
         
         currentAnimation = DOTween.Sequence();
         
@@ -199,16 +225,32 @@ public class UI_MenuButtonController : MonoBehaviour, IPointerEnterHandler, IPoi
         currentAnimation?.Kill();
         
         currentAnimation = DOTween.Sequence();
-        
-        Vector2 targetPosition = highlight 
+
+        Vector2 targetPosition = highlight
             ? originalAnchoredPosition + new Vector2(highlightBounceX, 0)
             : originalAnchoredPosition;
-        
-        // Position bounce
-        currentAnimation.Append(
-            buttonRect.DOAnchorPos(targetPosition, highlightDuration)
-                .SetEase(highlightEase)
-        );
+
+        if (highlight)
+        {
+            // Add a quick left-to-right sweep so hover motion matches the menu intro feel.
+            Vector2 sweepStart = originalAnchoredPosition + new Vector2(-Mathf.Abs(highlightSlideFromLeft), 0f);
+            currentAnimation.Append(
+                buttonRect.DOAnchorPos(sweepStart, highlightDuration * 0.25f)
+                    .SetEase(Ease.OutQuad)
+            );
+
+            currentAnimation.Append(
+                buttonRect.DOAnchorPos(targetPosition, highlightDuration * 0.75f)
+                    .SetEase(highlightEase)
+            );
+        }
+        else
+        {
+            currentAnimation.Append(
+                buttonRect.DOAnchorPos(targetPosition, highlightDuration)
+                    .SetEase(highlightEase)
+            );
+        }
         
         // Optional scale effect
         if (enableScaleOnHighlight)
@@ -277,14 +319,20 @@ public class UI_MenuButtonController : MonoBehaviour, IPointerEnterHandler, IPoi
     {
         isDisabled = false;
         if (canvasGroup != null)
+        {
             canvasGroup.interactable = true;
+            canvasGroup.blocksRaycasts = true;
+        }
     }
     
     public void Disable()
     {
         isDisabled = true;
         if (canvasGroup != null)
+        {
             canvasGroup.interactable = false;
+            canvasGroup.blocksRaycasts = false;
+        }
         
         // Reset to normal state
         if (isHighlighted)
