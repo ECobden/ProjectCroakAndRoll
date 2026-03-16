@@ -12,6 +12,7 @@ public class UI_MenuButtonController : MonoBehaviour, IPointerEnterHandler, IPoi
     [SerializeField] private float highlightDuration = 0.3f;
     [SerializeField] private Ease highlightEase = Ease.OutBack;
     [SerializeField] private float highlightSlideFromLeft = 20f;
+    [SerializeField] private float highlightCooldown = 0.12f;
     
     [SerializeField] private float clickBounceX = 20f;
     [SerializeField] private float clickDuration = 0.15f;
@@ -33,7 +34,6 @@ public class UI_MenuButtonController : MonoBehaviour, IPointerEnterHandler, IPoi
     [Header("UI References")]
     [SerializeField] private RectTransform buttonRect;
     [SerializeField] private TextMeshProUGUI buttonText;
-    [SerializeField] private CanvasGroup canvasGroup;
     [SerializeField] private Graphic clickTargetGraphic;
     
     [Header("Audio Settings")]
@@ -43,6 +43,7 @@ public class UI_MenuButtonController : MonoBehaviour, IPointerEnterHandler, IPoi
     
     [Header("Dice Integration")]
     [SerializeField] private UI_MainMenuDice menuDice;
+    [SerializeField] private bool useRandomDiceFace;
     [SerializeField] private int diceFaceNumber = 1;
     
     [Header("Events")]
@@ -56,15 +57,17 @@ public class UI_MenuButtonController : MonoBehaviour, IPointerEnterHandler, IPoi
     private bool isHighlighted = false;
     private bool isDisabled = false;
     private bool isVisible = false;
+    private float nextHighlightAllowedTime;
+    private bool isInitialized;
     
-    private void Awake()
+    public void Initialize()
     {
+        if (isInitialized)
+            return;
+
         // Setup references
         if (buttonRect == null)
             buttonRect = GetComponent<RectTransform>();
-        
-        if (canvasGroup == null)
-            canvasGroup = GetComponent<CanvasGroup>();
 
         if (clickTargetGraphic == null)
             clickTargetGraphic = GetComponent<Graphic>();
@@ -75,16 +78,9 @@ public class UI_MenuButtonController : MonoBehaviour, IPointerEnterHandler, IPoi
 
         if (clickTargetGraphic != null)
             clickTargetGraphic.raycastTarget = true;
-        
-        // Start hidden
-        if (canvasGroup != null)
-        {
-            canvasGroup.alpha = 0f;
-            canvasGroup.interactable = false;
-            canvasGroup.blocksRaycasts = false;
-        }
-        
+
         buttonRect.anchoredPosition = originalAnchoredPosition + new Vector2(showOffsetX, 0);
+        isInitialized = true;
     }
     
     private void OnDestroy()
@@ -99,9 +95,13 @@ public class UI_MenuButtonController : MonoBehaviour, IPointerEnterHandler, IPoi
     
     public void OnPointerEnter(PointerEventData eventData)
     {
-        if (isDisabled || !isVisible) return;
+        if (isDisabled || !isVisible || isHighlighted) return;
+
+        if (Time.unscaledTime < nextHighlightAllowedTime)
+            return;
         
         isHighlighted = true;
+        nextHighlightAllowedTime = Time.unscaledTime + Mathf.Max(0f, highlightCooldown);
         AnimateHighlight(true);
         PlaySound(hoverSound);
         onButtonHighlight?.Invoke();
@@ -109,13 +109,19 @@ public class UI_MenuButtonController : MonoBehaviour, IPointerEnterHandler, IPoi
         // Trigger dice animation if connected
         if (menuDice != null)
         {
-            menuDice.ShowFace(diceFaceNumber);
+            if (useRandomDiceFace)
+                menuDice.ShowRandomFace();
+            else
+                menuDice.ShowFace(diceFaceNumber);
         }
     }
     
     public void OnPointerExit(PointerEventData eventData)
     {
         if (isDisabled || !isVisible) return;
+
+        if (!isHighlighted)
+            return;
         
         isHighlighted = false;
         AnimateHighlight(false);
@@ -146,22 +152,8 @@ public class UI_MenuButtonController : MonoBehaviour, IPointerEnterHandler, IPoi
         isDisabled = false;
         currentAnimation?.Kill();
 
-        if (canvasGroup != null)
-        {
-            canvasGroup.interactable = true;
-            canvasGroup.blocksRaycasts = true;
-        }
-        
         currentAnimation = DOTween.Sequence();
-        
-        // Fade in
-        if (canvasGroup != null)
-        {
-            currentAnimation.Append(
-                canvasGroup.DOFade(1f, showDuration * 0.5f)
-            );
-        }
-        
+
         // Slide in from left with bounce
         currentAnimation.Join(
             buttonRect.DOAnchorPos(originalAnchoredPosition, showDuration)
@@ -189,22 +181,8 @@ public class UI_MenuButtonController : MonoBehaviour, IPointerEnterHandler, IPoi
         isVisible = false;
         currentAnimation?.Kill();
 
-        if (canvasGroup != null)
-        {
-            canvasGroup.interactable = false;
-            canvasGroup.blocksRaycasts = false;
-        }
-        
         currentAnimation = DOTween.Sequence();
-        
-        // Fade out
-        if (canvasGroup != null)
-        {
-            currentAnimation.Append(
-                canvasGroup.DOFade(0f, hideDuration)
-            );
-        }
-        
+
         // Slide out to left
         currentAnimation.Join(
             buttonRect.DOAnchorPos(originalAnchoredPosition + new Vector2(showOffsetX, 0), hideDuration)
@@ -309,6 +287,11 @@ public class UI_MenuButtonController : MonoBehaviour, IPointerEnterHandler, IPoi
     {
         diceFaceNumber = Mathf.Clamp(faceNumber, 1, 6);
     }
+
+    public void SetUseRandomDiceFace(bool useRandom)
+    {
+        useRandomDiceFace = useRandom;
+    }
     
     public void SetMenuDiceReference(UI_MainMenuDice dice)
     {
@@ -318,22 +301,12 @@ public class UI_MenuButtonController : MonoBehaviour, IPointerEnterHandler, IPoi
     public void Enable()
     {
         isDisabled = false;
-        if (canvasGroup != null)
-        {
-            canvasGroup.interactable = true;
-            canvasGroup.blocksRaycasts = true;
-        }
     }
     
     public void Disable()
     {
         isDisabled = true;
-        if (canvasGroup != null)
-        {
-            canvasGroup.interactable = false;
-            canvasGroup.blocksRaycasts = false;
-        }
-        
+
         // Reset to normal state
         if (isHighlighted)
         {

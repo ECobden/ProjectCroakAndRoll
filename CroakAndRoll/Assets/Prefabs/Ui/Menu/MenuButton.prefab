@@ -224,7 +224,6 @@ GameObject:
   - component: {fileID: 9113956009248014538}
   - component: {fileID: 6553752271292142749}
   - component: {fileID: 7807470067449405092}
-  - component: {fileID: 4010394802753251580}
   - component: {fileID: 8239705933501303803}
   m_Layer: 5
   m_Name: MenuButton
@@ -308,6 +307,7 @@ MonoBehaviour:
   highlightDuration: 0.3
   highlightEase: 27
   highlightSlideFromLeft: 20
+  highlightCooldown: 0.12
   clickBounceX: 20
   clickDuration: 0.15
   clickEase: 7
@@ -328,6 +328,7 @@ MonoBehaviour:
   clickSound: {fileID: 8300000, guid: 292aad821b16948af9cba9deaca16525, type: 3}
   audioSource: {fileID: 8239705933501303803}
   menuDice: {fileID: 0}
+  useRandomDiceFace: 0
   diceFaceNumber: 6
   onButtonClick:
     m_PersistentCalls:
@@ -338,18 +339,6 @@ MonoBehaviour:
   onButtonUnhighlight:
     m_PersistentCalls:
       m_Calls: []
---- !u!225 &4010394802753251580
-CanvasGroup:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8085745672450384564}
-  m_Enabled: 1
-  m_Alpha: 1
-  m_Interactable: 1
-  m_BlocksRaycasts: 1
-  m_IgnoreParentGroups: 0
 --- !u!82 &8239705933501303803
 AudioSource:
   m_ObjectHideFlags: 0

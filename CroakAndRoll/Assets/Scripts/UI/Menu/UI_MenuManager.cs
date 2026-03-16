@@ -1,6 +1,4 @@
 using UnityEngine;
-using UnityEngine.SceneManagement;
-using System.Collections.Generic;
 
 public class UI_MenuManager : MonoBehaviour
 {
@@ -8,16 +6,49 @@ public class UI_MenuManager : MonoBehaviour
     [SerializeField] private GameObject mainMenuPanel;
     [SerializeField] private GameObject optionsPanel;
 
+    [Header("Main Menu Buttons")]
+    [SerializeField] private UI_MenuButtonController continueButton;
+    [SerializeField] private UI_MenuButtonController newGameButton;
+    [SerializeField] private UI_MenuButtonController collectionsButton;
+    [SerializeField] private UI_MenuButtonController optionsButton;
+    [SerializeField] private UI_MenuButtonController exitButton;
+
     [Header("Main Menu Intro")]
-    [SerializeField] private List<UI_MenuButtonController> mainMenuButtons = new List<UI_MenuButtonController>();
     [SerializeField] private float introInitialDelay = 0.1f;
     [SerializeField] private float introButtonStagger = 0.12f;
-    
-    [Header("Scene Settings")]
-    [SerializeField] private string gameplaySceneName = "GameplayScene";
+
+    [Header("Debug\n" + 
+        "F1 - Show main menu + replay intro\n" +
+        "F2 - Show options panel\n" +
+        "F3 - Hide all menu panels")]
+    [SerializeField] private bool enableDebugKeys = true;
+
+
+    private void Update()
+    {
+        if (!enableDebugKeys) return;
+
+        if (Input.GetKeyDown(KeyCode.F1))
+        {
+            Debug.Log("[MenuManager] DEBUG: Showing main menu + replaying intro");
+            DebugShowMainMenu();
+        }
+        else if (Input.GetKeyDown(KeyCode.F2))
+        {
+            Debug.Log("[MenuManager] DEBUG: Showing options panel");
+            ShowOptions();
+        }
+        else if (Input.GetKeyDown(KeyCode.F3))
+        {
+            Debug.Log("[MenuManager] DEBUG: Hiding all panels");
+            DebugHideAll();
+        }
+    }
     
     private void Start()
     {
+        InitializeMenuButtons();
+
         // Initialize menu state
         ShowMainMenu();
         PlayMainMenuIntroAnimation();
@@ -26,12 +57,17 @@ public class UI_MenuManager : MonoBehaviour
     #region Main Menu Buttons
     
     /// <summary>
-    /// Starts the game by loading the gameplay scene
+    /// Starts the game by closing the menu
     /// </summary>
     public void OnPlayButtonClicked()
     {
-        Debug.Log("Loading gameplay scene...");
-        SceneManager.LoadScene(gameplaySceneName);
+        Debug.Log("Closing menu and starting gameplay...");
+
+        if (mainMenuPanel != null)
+            mainMenuPanel.SetActive(false);
+
+        if (optionsPanel != null)
+            optionsPanel.SetActive(false);
     }
     
     /// <summary>
@@ -73,7 +109,37 @@ public class UI_MenuManager : MonoBehaviour
     #endregion
     
     #region Helper Methods
-    
+
+    [ContextMenu("Debug: Show Main Menu")]
+    public void DebugShowMainMenu()
+    {
+        UI_MenuButtonController[] buttons = { continueButton, newGameButton, collectionsButton, optionsButton, exitButton };
+        foreach (UI_MenuButtonController btn in buttons)
+        {
+            if (btn != null)
+            {
+                btn.Hide();
+            }
+        }
+
+        ShowMainMenu();
+        PlayMainMenuIntroAnimation();
+    }
+
+    [ContextMenu("Debug: Hide All")]
+    public void DebugHideAll()
+    {
+        UI_MenuButtonController[] buttons = { continueButton, newGameButton, collectionsButton, optionsButton, exitButton };
+        foreach (UI_MenuButtonController btn in buttons)
+        {
+            if (btn != null)
+                btn.Hide();
+        }
+
+        if (mainMenuPanel != null) mainMenuPanel.SetActive(false);
+        if (optionsPanel != null) optionsPanel.SetActive(false);
+    }
+
     private void ShowMainMenu()
     {
         if (mainMenuPanel != null)
@@ -94,53 +160,35 @@ public class UI_MenuManager : MonoBehaviour
 
     private void PlayMainMenuIntroAnimation()
     {
-        List<UI_MenuButtonController> orderedButtons = GetOrderedMainMenuButtons();
+        UI_MenuButtonController[] buttons = { continueButton, newGameButton, collectionsButton, optionsButton, exitButton };
 
-        for (int i = 0; i < orderedButtons.Count; i++)
+        int index = 0;
+        foreach (UI_MenuButtonController button in buttons)
         {
-            UI_MenuButtonController button = orderedButtons[i];
-            if (button == null)
-                continue;
-
-            float delay = introInitialDelay + (introButtonStagger * i);
-            button.Show(delay);
+            if (button == null) continue;
+            button.Show(introInitialDelay + introButtonStagger * index);
+            index++;
         }
     }
 
-    private List<UI_MenuButtonController> GetOrderedMainMenuButtons()
+    private void InitializeMenuButtons()
     {
-        List<UI_MenuButtonController> buttons = new List<UI_MenuButtonController>();
+        UI_MenuButtonController[] buttons = { continueButton, newGameButton, collectionsButton, optionsButton, exitButton };
 
-        if (mainMenuButtons != null && mainMenuButtons.Count > 0)
+        foreach (UI_MenuButtonController button in buttons)
         {
-            for (int i = 0; i < mainMenuButtons.Count; i++)
-            {
-                if (mainMenuButtons[i] != null)
-                    buttons.Add(mainMenuButtons[i]);
-            }
-        }
-        else if (mainMenuPanel != null)
-        {
-            UI_MenuButtonController[] panelButtons = mainMenuPanel.GetComponentsInChildren<UI_MenuButtonController>(true);
-            for (int i = 0; i < panelButtons.Length; i++)
-            {
-                if (panelButtons[i] != null)
-                    buttons.Add(panelButtons[i]);
-            }
+            if (button != null)
+                button.Initialize();
         }
 
-        buttons.Sort((a, b) =>
+        if (optionsPanel != null)
         {
-            RectTransform aRect = a != null ? a.GetComponent<RectTransform>() : null;
-            RectTransform bRect = b != null ? b.GetComponent<RectTransform>() : null;
-
-            float aY = aRect != null ? aRect.anchoredPosition.y : float.MinValue;
-            float bY = bRect != null ? bRect.anchoredPosition.y : float.MinValue;
-
-            return bY.CompareTo(aY);
-        });
-
-        return buttons;
+            foreach (UI_MenuButtonController button in optionsPanel.GetComponentsInChildren<UI_MenuButtonController>(true))
+            {
+                if (button != null)
+                    button.Initialize();
+            }
+        }
     }
     
     #endregion

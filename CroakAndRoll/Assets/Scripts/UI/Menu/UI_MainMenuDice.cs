@@ -1,5 +1,4 @@
 using UnityEngine;
-using DG.Tweening;
 
 public class UI_MainMenuDice : MonoBehaviour
 {
@@ -10,8 +9,8 @@ public class UI_MainMenuDice : MonoBehaviour
     [SerializeField] private float jumpHeight = 0.5f;
     [SerializeField] private float jumpDuration = 0.4f;
     [SerializeField] private float rotateDuration = 0.3f;
-    [SerializeField] private Ease jumpEase = Ease.OutQuad;
-    [SerializeField] private Ease rotateEase = Ease.OutBack;
+    [SerializeField] private AnimationCurve jumpCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+    [SerializeField] private AnimationCurve rotateCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
     
     [Header("Idle Animation")]
     [SerializeField] private bool enableIdleRotation = true;
@@ -38,8 +37,9 @@ public class UI_MainMenuDice : MonoBehaviour
     [SerializeField] private Vector3 face6Rotation = new Vector3(0, 0, 90);
     
     private Vector3 originalPosition;
-    private Sequence currentAnimation;
-    private bool isIdleRotating = false;
+    private Coroutine animationCoroutine;
+    private bool isAnimating;
+    private int lastShownFace = 1;
     
     private void Start()
     {
@@ -52,19 +52,22 @@ public class UI_MainMenuDice : MonoBehaviour
         
         // Show default face (face 1) on start
         diceTransform.localRotation = Quaternion.Euler(face1Rotation);
+        lastShownFace = 1;
         
-        // Start idle rotation if enabled
-        if (enableIdleRotation)
-        {
-            StartIdleRotation();
-        }
+    }
+
+    private void Update()
+    {
+        if (diceTransform == null || isAnimating || !enableIdleRotation)
+            return;
+
+        diceTransform.Rotate(idleRotationAxis.normalized * idleRotationSpeed * Time.deltaTime, Space.Self);
     }
     
     private void OnDestroy()
     {
-        // Clean up tweens
-        currentAnimation?.Kill();
-        DOTween.Kill(diceTransform);
+        if (animationCoroutine != null)
+            StopCoroutine(animationCoroutine);
     }
     
     #region Public Methods
@@ -74,8 +77,24 @@ public class UI_MainMenuDice : MonoBehaviour
     /// </summary>
     public void ShowFace(int faceNumber)
     {
+        if (isAnimating)
+            return;
+
+        lastShownFace = Mathf.Clamp(faceNumber, 1, 6);
         Vector3 targetRotation = GetFaceRotation(faceNumber);
         AnimateDice(targetRotation);
+    }
+
+    /// <summary>
+    /// Animate dice to show a random face (1-6).
+    /// </summary>
+    public void ShowRandomFace()
+    {
+        int randomFace = Random.Range(1, 7);
+        if (randomFace == lastShownFace)
+            randomFace = randomFace == 6 ? 1 : randomFace + 1;
+
+        ShowFace(randomFace);
     }
     
     /// <summary>
@@ -116,58 +135,46 @@ public class UI_MainMenuDice : MonoBehaviour
     
     private void AnimateDice(Vector3 targetRotation)
     {
-        // Kill any existing animation
-        currentAnimation?.Kill();
-        StopIdleRotation();
-        
-        // Create jump and rotation sequence
-        currentAnimation = DOTween.Sequence();
-        
-        // Jump up
-        currentAnimation.Append(
-            diceTransform.DOLocalMoveY(originalPosition.y + jumpHeight, jumpDuration * 0.5f)
-                .SetEase(jumpEase)
-        );
-        
-        // Rotate while at peak
-        currentAnimation.Join(
-            diceTransform.DOLocalRotate(targetRotation, rotateDuration)
-                .SetEase(rotateEase)
-        );
-        
-        // Fall back down
-        currentAnimation.Append(
-            diceTransform.DOLocalMoveY(originalPosition.y, jumpDuration * 0.5f)
-                .SetEase(Ease.InQuad)
-        );
-        
-        // Resume idle rotation when done
-        if (enableIdleRotation)
+        if (diceTransform == null)
+            return;
+
+        if (animationCoroutine != null)
+            StopCoroutine(animationCoroutine);
+
+        animationCoroutine = StartCoroutine(AnimateDiceCoroutine(Quaternion.Euler(targetRotation)));
+    }
+    
+    private System.Collections.IEnumerator AnimateDiceCoroutine(Quaternion targetRotation)
+    {
+        isAnimating = true;
+
+        float jumpTime = Mathf.Max(0.01f, jumpDuration);
+        float rotationTime = Mathf.Max(0.01f, rotateDuration);
+        float totalTime = Mathf.Max(jumpTime, rotationTime);
+
+        Quaternion startRotation = diceTransform.localRotation;
+
+        float elapsed = 0f;
+        while (elapsed < totalTime)
         {
-            currentAnimation.OnComplete(() => StartIdleRotation());
+            elapsed += Time.deltaTime;
+
+            float jumpT = Mathf.Clamp01(elapsed / jumpTime);
+            float jumpProgress = jumpCurve != null ? jumpCurve.Evaluate(jumpT) : jumpT;
+            float jumpY = Mathf.Sin(jumpProgress * Mathf.PI) * jumpHeight;
+            diceTransform.localPosition = originalPosition + Vector3.up * jumpY;
+
+            float rotateT = Mathf.Clamp01(elapsed / rotationTime);
+            float rotateProgress = rotateCurve != null ? rotateCurve.Evaluate(rotateT) : rotateT;
+            diceTransform.localRotation = Quaternion.Slerp(startRotation, targetRotation, rotateProgress);
+
+            yield return null;
         }
-    }
-    
-    private void StartIdleRotation()
-    {
-        if (isIdleRotating) return;
-        
-        isIdleRotating = true;
-        diceTransform.DOLocalRotate(
-            diceTransform.localRotation.eulerAngles + (idleRotationAxis * 360f),
-            360f / idleRotationSpeed,
-            RotateMode.LocalAxisAdd
-        )
-        .SetLoops(-1, LoopType.Incremental)
-        .SetEase(Ease.Linear);
-    }
-    
-    private void StopIdleRotation()
-    {
-        if (!isIdleRotating) return;
-        
-        isIdleRotating = false;
-        DOTween.Kill(diceTransform);
+
+        diceTransform.localPosition = originalPosition;
+        diceTransform.localRotation = targetRotation;
+        isAnimating = false;
+        animationCoroutine = null;
     }
     
     private Vector3 GetFaceRotation(int faceNumber)
