@@ -141,8 +141,9 @@ public class ShopManager : MonoBehaviour
 
     /// <summary>
     /// Switch to the gameplay camera by adjusting priorities.
+    /// Public so GameManager can call it to ensure camera is set correctly on startup.
     /// </summary>
-    private void SwitchToGameplayCamera()
+    public void SwitchToGameplayCamera()
     {
         if (gameplayCamera != null)
         {

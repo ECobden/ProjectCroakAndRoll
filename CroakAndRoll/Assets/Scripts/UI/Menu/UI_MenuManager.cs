@@ -17,6 +17,9 @@ public class UI_MenuManager : MonoBehaviour
     [SerializeField] private float introInitialDelay = 0.1f;
     [SerializeField] private float introButtonStagger = 0.12f;
 
+    [Header("Gameplay")]
+    [SerializeField] private DB_GameManager gameManager;
+
     [Header("Debug\n" + 
         "F1 - Show main menu + replay intro\n" +
         "F2 - Show options panel\n" +
@@ -47,6 +50,9 @@ public class UI_MenuManager : MonoBehaviour
     
     private void Start()
     {
+        if (gameManager == null)
+            gameManager = FindFirstObjectByType<DB_GameManager>();
+
         InitializeMenuButtons();
 
         // Initialize menu state
@@ -55,6 +61,25 @@ public class UI_MenuManager : MonoBehaviour
     }
     
     #region Main Menu Buttons
+    
+    /// <summary>
+    /// Starts a new game and closes the menu
+    /// </summary>
+    public void OnNewGameButtonClicked()
+    {
+        Debug.Log("[MenuManager] New Game button clicked - initializing gameplay...");
+
+        if (gameManager != null)
+        {
+            gameManager.InitializeGame();
+        }
+        else
+        {
+            Debug.LogError("[MenuManager] No DB_GameManager found! Cannot start game.");
+        }
+
+        OnPlayButtonClicked();
+    }
     
     /// <summary>
     /// Starts the game by closing the menu
@@ -179,6 +204,13 @@ public class UI_MenuManager : MonoBehaviour
         {
             if (button != null)
                 button.Initialize();
+        }
+
+        // Wire up the new game button click handler
+        if (newGameButton != null)
+        {
+            newGameButton.onButtonClick.RemoveListener(OnNewGameButtonClicked);
+            newGameButton.onButtonClick.AddListener(OnNewGameButtonClicked);
         }
 
         if (optionsPanel != null)

@@ -12,6 +12,9 @@ public class DB_UIManager : MonoBehaviour
 
     #region Serialized Fields
 
+    [Header("Canvas References")]
+    [SerializeField] private GameObject gameplayUICanvas;
+
     [Header("UI References")]
     [SerializeField] private GameObject buttonPanel;
     [SerializeField] private UI_ButtonController buttonLeft;
@@ -82,6 +85,9 @@ public class DB_UIManager : MonoBehaviour
         }
 
         Instance = this;
+        
+        // Start with gameplay UI disabled - will be enabled when game initializes
+        HideGameplayUI();
     }
 
     public void Initialize(Action onRestartClicked)
@@ -90,6 +96,34 @@ public class DB_UIManager : MonoBehaviour
         HideAllPanels();
         ClearRollScoreText();
         CacheWaitForSeconds();
+    }
+
+    /// <summary>
+    /// Enable the gameplay UI canvas. Called when initializing gameplay.
+    /// </summary>
+    public void ShowGameplayUI()
+    {
+        if (gameplayUICanvas != null)
+        {
+            gameplayUICanvas.SetActive(true);
+            Debug.Log("[DB_UIManager] Gameplay UI canvas enabled");
+        }
+        else
+        {
+            Debug.LogWarning("[DB_UIManager] Gameplay UI canvas reference not assigned");
+        }
+    }
+
+    /// <summary>
+    /// Disable the gameplay UI canvas. Called at startup or when hiding gameplay.
+    /// </summary>
+    public void HideGameplayUI()
+    {
+        if (gameplayUICanvas != null)
+        {
+            gameplayUICanvas.SetActive(false);
+            Debug.Log("[DB_UIManager] Gameplay UI canvas disabled");
+        }
     }
 
     private void CacheWaitForSeconds()

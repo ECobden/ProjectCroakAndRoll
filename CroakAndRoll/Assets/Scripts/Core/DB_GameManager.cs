@@ -127,16 +127,9 @@ public class DB_GameManager : MonoBehaviour
 
     private void Start()
     {
-        if (sfxAudioSource == null)
-            sfxAudioSource = GetComponent<AudioSource>();
-
-        // One-time initialization only
-        InitializeDice();
-        InitializeUI();
-        InitializeEncounterProgression();
-        
-        // Start first round (round counter starts at 1)
-        StartRoundOne();
+        // Initialization will be called from the menu when starting a game
+        // This prevents auto-start when the scene loads
+        Debug.Log("[GameManager] Start() called. Awaiting InitializeGame() call from menu.");
     }
 
     private void Update()
@@ -150,6 +143,50 @@ public class DB_GameManager : MonoBehaviour
     #endregion
 
     #region Initialization
+
+    /// <summary>
+    /// Initializes the game for gameplay. Call this from the menu when starting a new game.
+    /// Sets up all required components, enables gameplay UI, and switches camera to gameplay.
+    /// </summary>
+    public void InitializeGame()
+    {
+        Debug.Log("[GameManager] InitializeGame() called - setting up gameplay");
+
+        if (sfxAudioSource == null)
+            sfxAudioSource = GetComponent<AudioSource>();
+
+        // One-time initialization only
+        InitializeDice();
+        InitializeUI();
+        InitializeEncounterProgression();
+        
+        // Show gameplay UI
+        if (uiManager != null)
+            uiManager.ShowGameplayUI();
+        
+        // Switch camera to gameplay
+        SwitchToGameplayCamera();
+        
+        // Start first round (round counter starts at 1)
+        StartRoundOne();
+    }
+
+    /// <summary>
+    /// Switches the cinematic camera to gameplay view by adjusting priorities.
+    /// </summary>
+    private void SwitchToGameplayCamera()
+    {
+        if (shopManager != null)
+        {
+            // Use ShopManager's camera switching logic
+            shopManager.SwitchToGameplayCamera();
+            Debug.Log("[GameManager] Switched to gameplay camera");
+        }
+        else
+        {
+            Debug.LogWarning("[GameManager] No ShopManager assigned - cannot switch camera");
+        }
+    }
 
     private void InitializeDice()
     {
@@ -988,6 +1025,10 @@ public class DB_GameManager : MonoBehaviour
         currentRound = 1;
         InitializeEncounterProgression();
         UpdateRoundUI();
+        
+        // Ensure camera is set to gameplay
+        SwitchToGameplayCamera();
+        
         StartRoundOne();
     }
 
