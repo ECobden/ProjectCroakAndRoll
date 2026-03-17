@@ -5,6 +5,7 @@ public class UI_MenuManager : MonoBehaviour
     [Header("Menu Panels")]
     [SerializeField] private GameObject mainMenuPanel;
     [SerializeField] private GameObject optionsPanel;
+    [SerializeField] private GameObject collectionsPanel;
 
     [Header("Main Menu Buttons")]
     [SerializeField] private UI_MenuButtonController continueButton;
@@ -20,12 +21,16 @@ public class UI_MenuManager : MonoBehaviour
     [Header("Gameplay")]
     [SerializeField] private DB_GameManager gameManager;
 
+    [Header("Main Menu Dice")]
+    [SerializeField] private UI_MainMenuDice mainMenuDice;
+
     [Header("Debug\n" + 
         "F1 - Show main menu + replay intro\n" +
         "F2 - Show options panel\n" +
         "F3 - Hide all menu panels")]
     [SerializeField] private bool enableDebugKeys = true;
 
+    private UI_MenuButtonController[] mainMenuButtons;
 
     private void Update()
     {
@@ -52,6 +57,8 @@ public class UI_MenuManager : MonoBehaviour
     {
         if (gameManager == null)
             gameManager = FindFirstObjectByType<DB_GameManager>();
+
+        mainMenuButtons = CreateMainMenuButtonsArray();
 
         InitializeMenuButtons();
 
@@ -88,11 +95,10 @@ public class UI_MenuManager : MonoBehaviour
     {
         Debug.Log("Closing menu and starting gameplay...");
 
-        if (mainMenuPanel != null)
-            mainMenuPanel.SetActive(false);
-
-        if (optionsPanel != null)
-            optionsPanel.SetActive(false);
+        HideMainMenuDice();
+        SetPanelState(mainMenuPanel, false);
+        SetPanelState(optionsPanel, false);
+        SetPanelState(collectionsPanel, false);
     }
     
     /// <summary>
@@ -102,6 +108,15 @@ public class UI_MenuManager : MonoBehaviour
     {
         Debug.Log("Opening options menu...");
         ShowOptions();
+    }
+
+    /// <summary>
+    /// Opens the collections menu
+    /// </summary>
+    public void OnCollectionsButtonClicked()
+    {
+        Debug.Log("Opening collections menu...");
+        ShowCollections();
     }
     
     /// <summary>
@@ -138,14 +153,7 @@ public class UI_MenuManager : MonoBehaviour
     [ContextMenu("Debug: Show Main Menu")]
     public void DebugShowMainMenu()
     {
-        UI_MenuButtonController[] buttons = { continueButton, newGameButton, collectionsButton, optionsButton, exitButton };
-        foreach (UI_MenuButtonController btn in buttons)
-        {
-            if (btn != null)
-            {
-                btn.Hide();
-            }
-        }
+        HideMainMenuButtons();
 
         ShowMainMenu();
         PlayMainMenuIntroAnimation();
@@ -154,41 +162,40 @@ public class UI_MenuManager : MonoBehaviour
     [ContextMenu("Debug: Hide All")]
     public void DebugHideAll()
     {
-        UI_MenuButtonController[] buttons = { continueButton, newGameButton, collectionsButton, optionsButton, exitButton };
-        foreach (UI_MenuButtonController btn in buttons)
-        {
-            if (btn != null)
-                btn.Hide();
-        }
-
-        if (mainMenuPanel != null) mainMenuPanel.SetActive(false);
-        if (optionsPanel != null) optionsPanel.SetActive(false);
+        HideMainMenuButtons();
+        SetPanelState(mainMenuPanel, false);
+        SetPanelState(optionsPanel, false);
+        SetPanelState(collectionsPanel, false);
     }
 
     private void ShowMainMenu()
     {
-        if (mainMenuPanel != null)
-            mainMenuPanel.SetActive(true);
-        
-        if (optionsPanel != null)
-            optionsPanel.SetActive(false);
+        SetupMainMenuDice();
+        SetPanelState(mainMenuPanel, true);
+        SetPanelState(optionsPanel, false);
+        SetPanelState(collectionsPanel, false);
     }
     
     private void ShowOptions()
     {
-        if (mainMenuPanel != null)
-            mainMenuPanel.SetActive(false);
-        
-        if (optionsPanel != null)
-            optionsPanel.SetActive(true);
+        HideMainMenuDice();
+        SetPanelState(mainMenuPanel, false);
+        SetPanelState(optionsPanel, true);
+        SetPanelState(collectionsPanel, false);
+    }
+
+    private void ShowCollections()
+    {
+        HideMainMenuDice();
+        SetPanelState(mainMenuPanel, false);
+        SetPanelState(optionsPanel, false);
+        SetPanelState(collectionsPanel, true);
     }
 
     private void PlayMainMenuIntroAnimation()
     {
-        UI_MenuButtonController[] buttons = { continueButton, newGameButton, collectionsButton, optionsButton, exitButton };
-
         int index = 0;
-        foreach (UI_MenuButtonController button in buttons)
+        foreach (UI_MenuButtonController button in mainMenuButtons)
         {
             if (button == null) continue;
             button.Show(introInitialDelay + introButtonStagger * index);
@@ -198,9 +205,7 @@ public class UI_MenuManager : MonoBehaviour
 
     private void InitializeMenuButtons()
     {
-        UI_MenuButtonController[] buttons = { continueButton, newGameButton, collectionsButton, optionsButton, exitButton };
-
-        foreach (UI_MenuButtonController button in buttons)
+        foreach (UI_MenuButtonController button in mainMenuButtons)
         {
             if (button != null)
                 button.Initialize();
@@ -213,6 +218,24 @@ public class UI_MenuManager : MonoBehaviour
             newGameButton.onButtonClick.AddListener(OnNewGameButtonClicked);
         }
 
+        if (optionsButton != null)
+        {
+            optionsButton.onButtonClick.RemoveListener(OnOptionsButtonClicked);
+            optionsButton.onButtonClick.AddListener(OnOptionsButtonClicked);
+        }
+
+        if (collectionsButton != null)
+        {
+            collectionsButton.onButtonClick.RemoveListener(OnCollectionsButtonClicked);
+            collectionsButton.onButtonClick.AddListener(OnCollectionsButtonClicked);
+        }
+
+        if (exitButton != null)
+        {
+            exitButton.onButtonClick.RemoveListener(OnExitButtonClicked);
+            exitButton.onButtonClick.AddListener(OnExitButtonClicked);
+        }
+
         if (optionsPanel != null)
         {
             foreach (UI_MenuButtonController button in optionsPanel.GetComponentsInChildren<UI_MenuButtonController>(true))
@@ -221,6 +244,38 @@ public class UI_MenuManager : MonoBehaviour
                     button.Initialize();
             }
         }
+    }
+
+    private UI_MenuButtonController[] CreateMainMenuButtonsArray()
+    {
+        return new[] { continueButton, newGameButton, collectionsButton, optionsButton, exitButton };
+    }
+
+    private void HideMainMenuButtons()
+    {
+        foreach (UI_MenuButtonController button in mainMenuButtons)
+        {
+            if (button != null)
+                button.Hide();
+        }
+    }
+
+    private void SetupMainMenuDice()
+    {
+        if (mainMenuDice != null)
+            mainMenuDice.SetupForMainMenu();
+    }
+
+    private void HideMainMenuDice()
+    {
+        if (mainMenuDice != null)
+            mainMenuDice.HideFromMainMenu();
+    }
+
+    private void SetPanelState(GameObject panel, bool isActive)
+    {
+        if (panel != null)
+            panel.SetActive(isActive);
     }
     
     #endregion

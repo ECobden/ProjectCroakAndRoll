@@ -4,6 +4,7 @@ public class UI_MainMenuDice : MonoBehaviour
 {
     [Header("Dice Settings")]
     [SerializeField] private Transform diceTransform;
+    [SerializeField] private Vector3 hiddenLocalOffset = new Vector3(0f, -700f, 0f);
     
     [Header("Animation Settings")]
     [SerializeField] private float jumpHeight = 0.5f;
@@ -39,6 +40,7 @@ public class UI_MainMenuDice : MonoBehaviour
     private Vector3 originalPosition;
     private Coroutine animationCoroutine;
     private bool isAnimating;
+    private bool isHidden;
     private int lastShownFace = 1;
     
     private void Start()
@@ -90,6 +92,9 @@ public class UI_MainMenuDice : MonoBehaviour
     /// </summary>
     public void ShowRandomFace()
     {
+        if (isHidden)
+            return;
+
         int randomFace = Random.Range(1, 7);
         if (randomFace == lastShownFace)
             randomFace = randomFace == 6 ? 1 : randomFace + 1;
@@ -127,6 +132,40 @@ public class UI_MainMenuDice : MonoBehaviour
     public void OnCustomButtonHighlight(int faceNumber)
     {
         ShowFace(faceNumber);
+    }
+
+    /// <summary>
+    /// Plays a jump animation and moves the dice off-screen.
+    /// Call this when leaving the main menu.
+    /// </summary>
+    public void HideFromMainMenu()
+    {
+        if (diceTransform == null)
+            return;
+
+        if (animationCoroutine != null)
+            StopCoroutine(animationCoroutine);
+
+        animationCoroutine = StartCoroutine(HideDiceCoroutine());
+    }
+
+    /// <summary>
+    /// Restores dice position/rotation for main menu and ensures it is visible again.
+    /// Call this when returning to main menu.
+    /// </summary>
+    public void SetupForMainMenu()
+    {
+        if (diceTransform == null)
+            return;
+
+        if (animationCoroutine != null)
+            StopCoroutine(animationCoroutine);
+
+        isAnimating = false;
+        isHidden = false;
+        diceTransform.localPosition = originalPosition;
+        diceTransform.localRotation = Quaternion.Euler(GetFaceRotation(lastShownFace));
+        animationCoroutine = null;
     }
     
     #endregion
@@ -173,6 +212,35 @@ public class UI_MainMenuDice : MonoBehaviour
 
         diceTransform.localPosition = originalPosition;
         diceTransform.localRotation = targetRotation;
+        isAnimating = false;
+        animationCoroutine = null;
+    }
+
+    private System.Collections.IEnumerator HideDiceCoroutine()
+    {
+        isAnimating = true;
+
+        float jumpTime = Mathf.Max(0.01f, jumpDuration);
+        Vector3 startPosition = diceTransform.localPosition;
+        Vector3 endPosition = originalPosition + hiddenLocalOffset;
+
+        float elapsed = 0f;
+        while (elapsed < jumpTime)
+        {
+            elapsed += Time.deltaTime;
+
+            float t = Mathf.Clamp01(elapsed / jumpTime);
+            float jumpProgress = jumpCurve != null ? jumpCurve.Evaluate(t) : t;
+            float jumpY = Mathf.Sin(jumpProgress * Mathf.PI) * jumpHeight;
+
+            Vector3 travel = Vector3.Lerp(startPosition, endPosition, t);
+            diceTransform.localPosition = travel + Vector3.up * jumpY;
+
+            yield return null;
+        }
+
+        diceTransform.localPosition = endPosition;
+        isHidden = true;
         isAnimating = false;
         animationCoroutine = null;
     }
